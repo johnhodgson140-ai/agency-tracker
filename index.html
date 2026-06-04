@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Agency Tracker">
+<meta name="theme-color" content="#FAFAF8">
+<title>Agency Tracker</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a1a' width='100' height='100' rx='20'/><text y='68' x='50' text-anchor='middle' font-size='50' fill='white'>A</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Mono',monospace;background:#FAFAF8;color:#1a1a1a;padding:16px;padding-top:env(safe-area-inset-top,16px);min-height:100vh;-webkit-font-smoothing:antialiased}
+.header-sub{font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#999;margin-bottom:4px}
+.header-title{font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;line-height:1.1}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-top:14px}
+.stat-card{background:#fff;border-radius:8px;padding:10px 8px;text-align:center;border:1px solid #eee}
+.stat-num{font-size:18px;font-weight:500}
+.stat-lbl{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-top:2px}
+.progress-bar{margin-top:8px;width:100%;height:6px;background:#e5e5e0;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width 0.3s}
+.progress-text{font-size:10px;color:#999;text-align:right;margin-top:3px}
+.tabs{display:flex;border-bottom:1px solid #ddd;margin:16px 0}
+.tab{padding:8px 16px;font-size:12px;color:#aaa;cursor:pointer;border:none;background:none;font-family:'DM Mono',monospace;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab.active{color:#1a1a1a;font-weight:500;border-bottom-color:#1a1a1a}
+.filter-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.filter-btn{font-size:10px;padding:4px 10px;border-radius:16px;font-family:'DM Mono',monospace;cursor:pointer;border:1px solid #ddd;background:#fff;color:#666}
+.filter-btn.active{border:1.5px solid #1a1a1a;background:#1a1a1a;color:#fff}
+.tier-btn{font-size:10px;padding:4px 10px;border-radius:16px;font-family:'DM Mono',monospace;cursor:pointer;border:1px solid #ddd;background:#fff;color:#666}
+.tier-btn.active{color:#fff}
+.agency-card{border:1px solid #e0e0dc;border-radius:10px;padding:12px 14px;margin-bottom:8px;background:#fff;transition:border-color 0.15s}
+.agency-row{display:flex;align-items:flex-start;gap:10px}
+.check-btn{width:24px;height:24px;border-radius:6px;flex-shrink:0;cursor:pointer;margin-top:1px;border:2px solid #ccc;background:#fff;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center}
+.check-btn.checked{border:none}
+.agency-name{font-size:13px;font-weight:500;color:#1a1a1a}
+.agency-tier{font-size:9px;padding:2px 7px;border-radius:10px;background:#f5f5f2;font-weight:500;display:inline-block;margin-left:6px}
+.agency-city{font-size:11px;color:#999;margin-top:2px}
+.status-badge{font-size:9px;padding:3px 8px;border-radius:10px;color:#fff;flex-shrink:0;font-family:'DM Mono',monospace;font-weight:500}
+.expanded{margin-top:10px;padding-top:10px;border-top:1px solid #eee}
+.apply-link{display:block;font-size:12px;color:#2563eb;text-decoration:none;margin-bottom:10px;padding:10px 12px;background:#f0f4ff;border-radius:8px;border:1px solid #dbe4ff;font-family:'DM Mono',monospace}
+.status-row{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px}
+.status-btn{font-size:10px;padding:5px 11px;border-radius:14px;font-family:'DM Mono',monospace;cursor:pointer;border:1px solid #ddd;background:#fff;color:#666}
+.status-btn.active{color:#fff}
+.note-input{width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:12px;background:#fff;font-family:'DM Mono',monospace;resize:vertical;color:#1a1a1a;min-height:50px;outline:none}
+.note-input:focus{border-color:#999}
+.stats-card{background:#fff;border:1px solid #e0e0dc;border-radius:10px;padding:18px 20px;margin-bottom:14px}
+.stats-title{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:#999;margin-bottom:14px}
+.stat-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f0f0ec}
+.stat-row:last-child{border-bottom:none}
+.stat-key{font-size:13px;color:#888}
+.stat-val{font-size:13px;font-weight:500;color:#1a1a1a}
+.copy-btn{width:100%;margin-top:14px;padding:12px;font-size:12px;border:none;border-radius:8px;background:#1a1a1a;color:#fff;cursor:pointer;font-family:'DM Mono',monospace;font-weight:500}
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.summary-card{background:#f8f8f5;border-radius:8px;padding:10px 12px;border:1px solid #eee}
+.summary-num{font-size:16px;font-weight:500;color:#1a1a1a}
+.summary-lbl{font-size:10px;color:#999;margin-top:2px}
+.note-box{margin-top:14px;padding:12px 14px;background:#fff;border-radius:8px;border:1px solid #eee;font-size:11px;color:#888;line-height:1.6}
+.empty{text-align:center;color:#999;padding:30px;font-size:12px;background:#fff;border-radius:10px;border:1px solid #eee}
+.section-label{font-size:11px;color:#888;margin-bottom:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const AGENCIES=[
+{id:"1",name:"IMG London",city:"London",tier:"Tier 1",link:"imgmodels.com/submit"},
+{id:"2",name:"Next Management",city:"London",tier:"Tier 1",link:"nextmanagement.com/become-a-model"},
+{id:"3",name:"Premier",city:"London",tier:"Tier 1",link:"premiermodelmanagement.com/become-a-model"},
+{id:"4",name:"Storm",city:"London",tier:"Tier 1",link:"stormmodels.com/become-a-model"},
+{id:"5",name:"Models 1",city:"London",tier:"Tier 1",link:"models1.co.uk/become-a-model"},
+{id:"6",name:"Elite London",city:"London",tier:"Tier 1",link:"elitemodel.co.uk/become-a-model"},
+{id:"7",name:"Select",city:"London",tier:"Tier 1",link:"selectmodel.com/become-a-model"},
+{id:"8",name:"Viva London",city:"London",tier:"Tier 2",link:"vivalondon.com"},
+{id:"9",name:"MiLK Management",city:"London",tier:"Tier 2",link:"milkmanagement.co.uk"},
+{id:"10",name:"The Squad",city:"London",tier:"Tier 2",link:"thesquad.management"},
+{id:"11",name:"Supa",city:"London",tier:"Tier 2",link:"supamodelmanagement.com"},
+{id:"12",name:"Kult London",city:"London",tier:"Tier 2",link:"kultlondon.uk"},
+{id:"13",name:"Anti-Agency",city:"London",tier:"Tier 2",link:"anti-agency.com/apply"},
+{id:"14",name:"Perspective Mgmt",city:"London",tier:"Tier 2",link:"perspectivemanagement.com"},
+{id:"15",name:"PRM London",city:"London",tier:"Tier 3",link:"prmldn.com"},
+{id:"16",name:"Grey Model Mgmt",city:"London",tier:"Tier 3",link:"greymodelmanagement.com"},
+{id:"17",name:"Tomorrow Is Another Day",city:"London",tier:"Tier 3",link:"tomorrowisanotherday.net"},
+{id:"18",name:"Established Models",city:"London",tier:"Tier 3",link:"establishedmodels.com"},
+{id:"19",name:"Linden Staub",city:"London",tier:"Tier 3",link:"lindenstaub.com"},
+{id:"20",name:"Body London",city:"London",tier:"Tier 3",link:"bodylondon.com"},
+{id:"21",name:"Named Models",city:"London",tier:"Tier 3",link:"namedmodels.com"},
+{id:"22",name:"IMG New York",city:"New York",tier:"Intl",link:"imgmodels.com/submit"},
+{id:"23",name:"Wilhelmina",city:"New York",tier:"Intl",link:"wilhelmina.com/become-a-model"},
+{id:"24",name:"Ford Models",city:"New York",tier:"Intl",link:"fordmodels.com/become-a-model"},
+{id:"25",name:"The Society",city:"New York",tier:"Intl",link:"thesocietymanagement.com"},
+{id:"26",name:"Soul Artist Mgmt",city:"New York",tier:"Intl",link:"soulartistmgmt.com"},
+{id:"27",name:"Heroes Models",city:"New York",tier:"Intl",link:"heroesmodels.com"},
+{id:"28",name:"Wilhelmina LA",city:"Los Angeles",tier:"Intl",link:"wilhelmina.com/become-a-model"},
+{id:"29",name:"Next LA",city:"Los Angeles",tier:"Intl",link:"nextmanagement.com/become-a-model"},
+{id:"30",name:"DT Model Mgmt",city:"Los Angeles",tier:"Intl",link:"dtmodelmanagement.com"},
+{id:"31",name:"Elite Paris",city:"Paris",tier:"Intl",link:"elitemodel.fr"},
+{id:"32",name:"Success Models",city:"Paris",tier:"Intl",link:"successmodels.com"},
+{id:"33",name:"New Madison",city:"Paris",tier:"Intl",link:"newmadisonmodels.com"},
+{id:"34",name:"Bananas",city:"Paris",tier:"Intl",link:"bananas-models.com"},
+{id:"35",name:"Premium Models",city:"Paris",tier:"Intl",link:"premiummodels.fr"},
+{id:"36",name:"Elite Milan",city:"Milan",tier:"Intl",link:"elitemodelworld.com"},
+{id:"37",name:"d'management",city:"Milan",tier:"Intl",link:"dmanagementgroup.com"},
+{id:"38",name:"Why Not Models",city:"Milan",tier:"Intl",link:"whynotmodels.com"},
+{id:"39",name:"Independent Men",city:"Milan",tier:"Intl",link:"independentmodelmgmt.com"},
+{id:"40",name:"Bravo Models",city:"Tokyo",tier:"Intl",link:"bravomodels.net"},
+{id:"41",name:"Donna Models",city:"Tokyo",tier:"Intl",link:"donna-models.com"},
+{id:"42",name:"CDU Models",city:"Tokyo",tier:"Intl",link:"cdumodels.com"},
+{id:"43",name:"Bon Image",city:"Tokyo",tier:"Intl",link:"bonimage.co.jp"},
+{id:"44",name:"ESteem Models",city:"Seoul",tier:"Intl",link:"esteemmodels.co.kr"},
+{id:"45",name:"YG KPlus",city:"Seoul",tier:"Intl",link:"ygkplus.com"},
+{id:"46",name:"Two Management",city:"Hamburg",tier:"Intl",link:"twomanagement.com"},
+{id:"47",name:"Seeds Berlin",city:"Berlin",tier:"Intl",link:"seedsberlin.com"},
+{id:"48",name:"Kult Stockholm",city:"Stockholm",tier:"Intl",link:"kultmodels.com"},
+{id:"49",name:"Independent Men NL",city:"Amsterdam",tier:"Intl",link:"independentmen.nl"},
+{id:"50",name:"IMG Australia",city:"Sydney",tier:"Intl",link:"imgmodels.com/submit"},
+{id:"51",name:"Get Scouted",city:"Online",tier:"Scout",link:"getscouted.co"},
+{id:"52",name:"ModelScouts",city:"Online",tier:"Scout",link:"modelscouts.com"}
+];
+
+const STATS=[["Height","187cm / 6'1.5\""],["Chest","98cm"],["Waist","76cm"],["Hips","83cm"],["Shoulder","46cm"],["Neck","40cm"],["Sleeve","86cm"],["Shoe","EU 42"],["Age","18"],["Build","Athletic / Slim"],["Location","London, UK"],["Experience","New faces"]];
+const STATUS_OPTS=["Not applied","Applied","Response","Meeting","Signed","Rejected"];
+const S_COLORS={"Not applied":"#ccc","Applied":"#3b82f6","Response":"#d97706","Meeting":"#7c3aed","Signed":"#22c55e","Rejected":"#ef4444"};
+const T_COLORS={"Tier 1":"#16a34a","Tier 2":"#d97706","Tier 3":"#7c3aed","Intl":"#2563eb","Scout":"#db2777"};
+
+let state={tab:"tracker",filter:"All",tierFilter:"All",expanded:null,data:JSON.parse(localStorage.getItem("agency-tracker")||"{}"),showMore:false};
+
+function save(){localStorage.setItem("agency-tracker",JSON.stringify(state.data))}
+function getS(id){return state.data[id]?.status||"Not applied"}
+function getN(id){return state.data[id]?.note||""}
+function getD(id){return state.data[id]?.date||""}
+function setS(id,s){state.data[id]={...state.data[id],status:s,date:s==="Applied"&&!state.data[id]?.date?new Date().toLocaleDateString("en-GB"):state.data[id]?.date||""};save();render()}
+function setN(id,n){state.data[id]={...state.data[id],note:n};save()}
+
+function render(){
+const app=document.getElementById("app");
+const applied=AGENCIES.filter(a=>getS(a.id)!=="Not applied").length;
+const responses=AGENCIES.filter(a=>["Response","Meeting","Signed"].includes(getS(a.id))).length;
+const meetings=AGENCIES.filter(a=>["Meeting","Signed"].includes(getS(a.id))).length;
+const pct=Math.round((applied/AGENCIES.length)*100);
+const filtered=AGENCIES.filter(a=>{
+if(state.filter!=="All"&&a.city!==state.filter)return false;
+if(state.tierFilter!=="All"&&a.tier!==state.tierFilter)return false;
+return true;
+});
+const mainCities=["All","London","New York","Paris","Milan","Tokyo"];
+const moreCities=["Seoul","Los Angeles","Hamburg","Berlin","Stockholm","Amsterdam","Sydney","Online"];
+
+let h=`
+<div class="header-sub">Model Agency</div>
+<div class="header-title">Application Tracker</div>
+<div class="stats-grid">
+<div class="stat-card"><div class="stat-num" style="color:#3b82f6">${applied}</div><div class="stat-lbl">Applied</div></div>
+<div class="stat-card"><div class="stat-num" style="color:#d97706">${responses}</div><div class="stat-lbl">Responses</div></div>
+<div class="stat-card"><div class="stat-num" style="color:#7c3aed">${meetings}</div><div class="stat-lbl">Meetings</div></div>
+<div class="stat-card"><div class="stat-num" style="color:#1a1a1a">${AGENCIES.length}</div><div class="stat-lbl">Total</div></div>
+</div>
+<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${pct===100?'#22c55e':'#3b82f6'}"></div></div>
+<div class="progress-text">${pct}% applied</div>
+<div class="tabs">
+<button class="tab ${state.tab==='tracker'?'active':''}" onclick="state.tab='tracker';render()">Agencies</button>
+<button class="tab ${state.tab==='stats'?'active':''}" onclick="state.tab='stats';render()">My Stats</button>
+</div>`;
+
+if(state.tab==="tracker"){
+h+=`<div class="filter-row">`;
+mainCities.forEach(c=>{h+=`<button class="filter-btn ${state.filter===c?'active':''}" onclick="state.filter='${c}';render()">${c}</button>`});
+h+=`<button class="filter-btn" onclick="state.showMore=!state.showMore;render()">${state.showMore?'Less ▴':'More ▾'}</button></div>`;
+if(state.showMore){
+h+=`<div class="filter-row">`;
+moreCities.forEach(c=>{h+=`<button class="filter-btn ${state.filter===c?'active':''}" onclick="state.filter='${c}';render()">${c}</button>`});
+h+=`</div>`;
+}
+h+=`<div class="filter-row" style="margin-bottom:14px">`;
+["All","Tier 1","Tier 2","Tier 3","Intl","Scout"].forEach(t=>{
+const tc=T_COLORS[t]||"#1a1a1a";
+const isA=state.tierFilter===t;
+h+=`<button class="tier-btn${isA?' active':''}" style="${isA?`border:1.5px solid ${tc};background:${tc};color:#fff`:`border:1px solid #ddd`}" onclick="state.tierFilter='${t}';render()">${t}</button>`;
+});
+h+=`</div>`;
+
+filtered.forEach(a=>{
+const s=getS(a.id);const isA=s!=="Not applied";const isE=state.expanded===a.id;const sc=S_COLORS[s];const tc=T_COLORS[a.tier];
+h+=`<div class="agency-card" style="border-color:${isA?sc:'#e0e0dc'};border-width:${isA?'1.5px':'1px'};opacity:${s==='Rejected'?0.5:1}">
+<div class="agency-row">
+<button class="check-btn${isA?' checked':''}" style="${isA?`background:${sc};border:none`:''}" onclick="setS('${a.id}','${isA?'Not applied':'Applied'}');">${isA?'✓':''}</button>
+<div style="flex:1;min-width:0;cursor:pointer" onclick="state.expanded=state.expanded==='${a.id}'?null:'${a.id}';render()">
+<div><span class="agency-name">${a.name}</span><span class="agency-tier" style="color:${tc}">${a.tier}</span></div>
+<div class="agency-city">${a.city}${getD(a.id)?' · Applied '+getD(a.id):''}</div>
+</div>
+${isA?`<span class="status-badge" style="background:${sc}">${s}</span>`:''}
+</div>`;
+if(isE){
+h+=`<div class="expanded">
+<a href="https://${a.link}" target="_blank" rel="noopener noreferrer" class="apply-link">Open: ${a.link} ↗</a>
+<div class="section-label">Status</div>
+<div class="status-row">`;
+STATUS_OPTS.forEach(st=>{
+const stc=S_COLORS[st];const isAs=s===st;
+h+=`<button class="status-btn${isAs?' active':''}" style="${isAs?`border:1.5px solid ${stc};background:${stc};color:#fff`:''}" onclick="setS('${a.id}','${st}')">${st}</button>`;
+});
+h+=`</div>
+<div class="section-label">Notes</div>
+<textarea class="note-input" id="note-${a.id}" oninput="setN('${a.id}',this.value)" placeholder="Response details, contact name, follow-up...">${getN(a.id)}</textarea>
+</div>`;
+}
+h+=`</div>`;
+});
+if(filtered.length===0)h+=`<div class="empty">No agencies match this filter</div>`;
+
+}else{
+h+=`<div class="stats-card"><div class="stats-title">My measurements</div>`;
+STATS.forEach(([k,v],i)=>{h+=`<div class="stat-row" ${i===STATS.length-1?'style="border-bottom:none"':''}><span class="stat-key">${k}</span><span class="stat-val">${v}</span></div>`});
+h+=`<button class="copy-btn" onclick="copyStats()">Copy all measurements</button></div>`;
+h+=`<div class="stats-card"><div class="stats-title">Summary</div><div class="summary-grid">`;
+[["Total agencies",AGENCIES.length],["Applied",applied],["Response rate",applied>0?Math.round((responses/applied)*100)+"%":"—"],["Meetings",meetings],["London",AGENCIES.filter(a=>a.city==="London").length],["International",AGENCIES.filter(a=>a.tier==="Intl").length]].forEach(([l,v])=>{
+h+=`<div class="summary-card"><div class="summary-num">${v}</div><div class="summary-lbl">${l}</div></div>`;
+});
+h+=`</div></div>`;
+h+=`<div class="note-box">Resubmit to agencies that didn't respond after 3-6 months with fresh digitals. Track follow-up dates in notes.</div>`;
+}
+app.innerHTML=h;
+}
+
+function copyStats(){
+const text=STATS.map(([k,v])=>k+": "+v).join("\n");
+navigator.clipboard.writeText(text).then(()=>{
+const btn=document.querySelector(".copy-btn");if(btn){btn.textContent="Copied!";setTimeout(()=>{btn.textContent="Copy all measurements"},2000)}
+}).catch(()=>alert(STATS.map(([k,v])=>k+": "+v).join("\n")));
+}
+
+render();
+</script>
+</body>
+</html>
