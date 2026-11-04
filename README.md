@@ -18,10 +18,14 @@ during a diet is picked up automatically instead of being argued about.
 
 - Adaptive burn estimate with a stated confidence, and the arithmetic shown in words
 - Daily calorie and macro targets, fibre at the 14 g / 1000 kcal guideline
-- ~150-food reference table, your own foods, and saved meals you log in one tap
+- Thirteen micronutrients tracked against DRI targets and ceilings, with an honest
+  coverage figure so partially-logged days do not read as deficiencies
+- Weekly check-ins: weight, waist, hips, chest, arm, thigh, neck, body fat and a note
+- ~150-food reference table carrying full nutrient profiles, your own foods, and saved
+  meals you log in one tap
 - Plain-language logging: type or dictate "log my tuna rice meal for lunch"
-- Weight trend, energy balance, weekday pattern and consistency charts
-- CSV export of every day, weigh-in, trend, burn and target
+- Weight trend, energy balance, weekday pattern, body and consistency panels
+- CSV export of every day, weigh-in, measurement, nutrient and target
 
 ## Two versions
 
@@ -36,9 +40,13 @@ Those features hide themselves here, where there is no Claude to ask.
 
 ## Using it
 
-Open Setup first — height, age, activity, goal weight and the rate you want. Then
-weigh in daily (same time, before eating) and log what you eat. The engine needs
-roughly ten days of both before it stops leaning on the formula.
+Open Setup first — height, age, activity, starting weight, goal weight and the rate
+you want. Then log what you eat, and weigh in.
+
+Weighing daily is better, but weekly works: gaps between weigh-ins are filled by
+straight-line interpolation before smoothing, so a weekly cadence recovers the same
+trend slope. The engine needs two weigh-ins at least ten days apart inside its window
+before it will measure anything; below that it says so and stays on the formula.
 
 Day-to-day scale noise is expected and ignored; only the trend line feeds the
 estimate.

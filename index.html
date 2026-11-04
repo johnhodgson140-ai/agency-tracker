@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="A personal calorie and macro ledger that measures your real daily burn from your own intake and weight-trend data.">
+<meta name="description" content="A personal calorie, macro and micronutrient ledger that measures your real daily burn from your own intake and weight-trend data.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -137,6 +137,21 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:va
 .track{height:7px;border-radius:999px;background:var(--surface-3);overflow:hidden;position:relative}
 .track i{display:block;height:100%;border-radius:999px}
 .track u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.45}
+
+/* ---------- micronutrient meters ---------- */
+.micros{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 18px}
+.mi{display:flex;flex-direction:column;gap:4px;min-width:0}
+.mi .n{font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.mi .track{height:5px}
+.mi .foot{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;
+  font-family:var(--mono);font-size:10px;font-variant-numeric:tabular-nums}
+.mi .foot .v{color:var(--ink);white-space:nowrap}
+.mi .foot .flag{margin-left:auto;flex:none;letter-spacing:.06em;text-transform:uppercase}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"\25B8\00a0"}
+details[open]>summary::before{content:"\25BE\00a0"}
 
 /* ---------- meal sections ---------- */
 .meal{border-top:1px solid var(--rule)}
@@ -344,16 +359,27 @@ table.data td:first-child{font-variant-numeric:normal}
     <div class="macros" id="macroRows"></div>
   </div>
 
+  <div class="panel">
+    <div class="panel-h"><h2>Micronutrients</h2><span class="sub" id="microSub"></span></div>
+    <div class="micros" id="microGrid"></div>
+    <p class="note" style="margin:12px 0 0" id="microNote"></p>
+  </div>
+
   <div class="panel flush" id="mealsPanel"></div>
 
   <div class="panel">
-    <div class="panel-h"><h2>Weigh-in</h2><span class="sub" id="weighSub"></span></div>
+    <div class="panel-h"><h2>Check-in</h2><span class="sub" id="weighSub"></span></div>
+    <div id="checkinDue" hidden></div>
     <div class="calbox">
       <div class="field">
         <input type="number" id="weightIn" step="0.1" inputmode="decimal" placeholder="e.g. 82.4">
       </div>
       <button class="btn primary" id="weightSave">Save</button>
     </div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn ghost grow" id="openCheckin">Weekly measurements</button>
+    </div>
+    <div id="statsSummary"></div>
     <p class="note" style="margin:9px 0 0">Weigh at the same time each day, before eating. Day-to-day
       noise is expected — the trend line is what the engine uses.</p>
   </div>
@@ -441,6 +467,18 @@ table.data td:first-child{font-variant-numeric:normal}
   </div>
 
   <div class="panel">
+    <div class="panel-h"><h2>Micronutrients</h2><span class="sub" id="microAvgSub"></span></div>
+    <div class="micros" id="microAvgGrid"></div>
+    <p class="note" style="margin:12px 0 0" id="microAvgNote"></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h"><h2>Body</h2><span class="sub" id="bodySub"></span></div>
+    <div class="stats" id="bodyStats"></div>
+    <div class="scrollx" style="margin-top:13px"><table class="data" id="bodyTable"></table></div>
+  </div>
+
+  <div class="panel">
     <div class="panel-h"><h2>By weekday</h2><span class="sub">average intake, last 8 weeks</span></div>
     <div class="chart" id="chartWeekday"></div>
     <div class="legend">
@@ -499,6 +537,7 @@ table.data td:first-child{font-variant-numeric:normal}
       </div>
       <div class="field"><span class="lbl">Age</span><input type="number" id="pAge" inputmode="numeric"></div>
       <div class="field"><span class="lbl" id="hLbl">Height cm</span><input type="number" id="pHeight" inputmode="decimal"></div>
+      <div class="field"><span class="lbl" id="swLbl">Starting weight kg</span><input type="number" id="pStartW" step="0.1" inputmode="decimal"></div>
     </div>
     <div class="field" style="margin-top:11px"><span class="lbl">Daily activity, before exercise</span>
       <select id="pAct">
@@ -580,154 +619,178 @@ table.data td:first-child{font-variant-numeric:normal}
 const CATS = {pro:"Protein",dai:"Dairy",grn:"Grains",leg:"Beans & nuts",nut:"Fats & nuts",
   veg:"Vegetables",fru:"Fruit",drk:"Drinks",snk:"Snacks",mea:"Prepared",con:"Extras"};
 const RAW_DB = [
-["Chicken breast, cooked","pro",165,31,0,3.6,0,[["breast, 150 g",150],["100 g",100]]],
-["Chicken breast, raw","pro",120,22.5,0,2.6,0,[["breast, 180 g",180]]],
-["Chicken thigh, cooked","pro",209,26,0,10.9,0,[["thigh, 90 g",90]]],
-["Chicken, rotisserie, no skin","pro",190,29,0,7.5,0],
-["Turkey breast, cooked","pro",135,30,0,1,0,[["slice, 30 g",30]]],
-["Beef mince, 5% fat, cooked","pro",176,26,0,8,0,[["125 g",125]]],
-["Beef mince, 20% fat, cooked","pro",254,26,0,16,0,[["125 g",125]]],
-["Sirloin steak, cooked","pro",212,29,0,10,0,[["steak, 200 g",200]]],
-["Pork loin, cooked","pro",187,27,0,8,0,[["chop, 150 g",150]]],
-["Bacon, cooked","pro",541,37,1.4,42,0,[["rasher, 15 g",15]]],
-["Lamb chop, cooked","pro",294,25,0,21,0,[["chop, 110 g",110]]],
-["Salmon fillet, cooked","pro",206,22,0,12,0,[["fillet, 130 g",130]]],
-["Tuna, canned in water","pro",116,26,0,0.8,0,[["can, drained 112 g",112]]],
-["Tuna steak, cooked","pro",184,30,0,6,0,[["steak, 150 g",150]]],
-["Cod, cooked","pro",105,23,0,0.9,0,[["fillet, 140 g",140]]],
-["Prawns, cooked","pro",99,24,0.2,0.3,0,[["100 g",100]]],
-["Sardines, canned in oil","pro",208,25,0,11,0,[["can, 90 g",90]]],
-["Mackerel, cooked","pro",262,24,0,18,0,[["fillet, 110 g",110]]],
-["Egg, whole","pro",143,12.6,0.7,9.5,0,[["large egg, 50 g",50],["medium egg, 44 g",44]]],
-["Egg white","pro",52,10.9,0.7,0.2,0,[["white of 1 egg, 33 g",33]]],
-["Tofu, firm","pro",144,17,2.8,9,2,[["block, 200 g",200]]],
-["Tempeh","pro",192,20,7.6,11,0,[["100 g",100]]],
-["Whey protein powder","pro",400,80,8,6,0,[["scoop, 30 g",30]]],
-["Protein shake, ready to drink","pro",42,8,1.5,0.5,0,[["bottle, 330 ml",330]]],
-["Greek yogurt, 0% fat","dai",59,10,3.6,0.4,0,[["pot, 170 g",170],["100 g",100]]],
-["Greek yogurt, 5% fat","dai",97,9,4,5,0,[["pot, 170 g",170]]],
-["Cottage cheese, low fat","dai",98,11,3.4,4.3,0,[["pot, 200 g",200]]],
-["Milk, whole","dai",61,3.2,4.8,3.3,0,[["cup, 240 ml",240],["splash, 30 ml",30]]],
-["Milk, semi-skimmed","dai",47,3.4,4.8,1.7,0,[["cup, 240 ml",240]]],
-["Milk, skimmed","dai",34,3.4,5,0.1,0,[["cup, 240 ml",240]]],
-["Cheddar cheese","dai",403,25,1.3,33,0,[["slice, 25 g",25],["30 g",30]]],
-["Mozzarella","dai",280,22,2.2,20,0,[["ball, 125 g",125]]],
-["Parmesan","dai",392,36,3.2,26,0,[["tbsp grated, 5 g",5]]],
-["Feta","dai",264,14,4.1,21,0,[["30 g",30]]],
-["Halloumi","dai",321,22,2,25,0,[["slice, 30 g",30]]],
-["Butter","dai",717,0.9,0.1,81,0,[["tsp, 5 g",5],["pat, 10 g",10]]],
-["Double cream","dai",449,2.1,2.8,48,0,[["tbsp, 15 ml",15]]],
-["Rice, white, cooked","grn",130,2.7,28,0.3,0.4,[["cup, 158 g",158],["100 g",100]]],
-["Rice, brown, cooked","grn",123,2.7,26,1,1.6,[["cup, 195 g",195]]],
-["Rice, white, dry","grn",365,7,80,0.7,1.3,[["75 g dry",75]]],
-["Pasta, cooked","grn",158,5.8,31,0.9,1.8,[["bowl, 220 g",220],["100 g",100]]],
-["Pasta, dry","grn",371,13,75,1.5,3.2,[["75 g dry",75],["100 g dry",100]]],
-["Bread, white","grn",266,9,49,3.3,2.7,[["slice, 36 g",36]]],
-["Bread, wholemeal","grn",247,13,41,3.4,7,[["slice, 40 g",40]]],
-["Sourdough bread","grn",270,11,52,2,2.4,[["slice, 50 g",50]]],
-["Pita bread","grn",275,9,55,1.2,2.2,[["pita, 60 g",60]]],
-["Bagel","grn",257,10,50,1.5,2.1,[["bagel, 95 g",95]]],
-["Tortilla wrap, flour","grn",306,8,51,7,3,[["wrap, 45 g",45]]],
-["Oats, rolled, dry","grn",389,16.9,66,6.9,10.6,[["40 g",40],["60 g",60]]],
-["Weetabix","grn",362,12,68,2,10,[["2 biscuits, 38 g",38]]],
-["Cornflakes","grn",357,7.5,84,0.4,3,[["bowl, 40 g",40]]],
-["Granola","grn",471,10,64,20,7,[["50 g",50]]],
-["Quinoa, cooked","grn",120,4.4,21,1.9,2.8,[["cup, 185 g",185]]],
-["Couscous, cooked","grn",112,3.8,23,0.2,1.4,[["cup, 157 g",157]]],
-["Egg noodles, cooked","grn",138,4.5,25,2.1,1.2,[["nest, 150 g",150]]],
-["Potato, boiled","grn",87,2,20,0.1,1.8,[["medium, 170 g",170]]],
-["Potato, baked","grn",93,2.5,21,0.1,2.2,[["medium, 200 g",200]]],
-["Sweet potato, baked","grn",90,2,21,0.1,3.3,[["medium, 150 g",150]]],
-["Oven chips","grn",170,2.6,26,6,2.5,[["portion, 150 g",150]]],
-["Rice cakes","grn",387,8,81,3,3,[["cake, 9 g",9]]],
-["Lentils, cooked","leg",116,9,20,0.4,7.9,[["cup, 198 g",198]]],
-["Chickpeas, cooked","leg",164,8.9,27,2.6,7.6,[["can, drained 240 g",240]]],
-["Black beans, cooked","leg",132,8.9,24,0.5,8.7,[["cup, 172 g",172]]],
-["Kidney beans, cooked","leg",127,8.7,23,0.5,6.4,[["cup, 177 g",177]]],
-["Baked beans","leg",94,4.8,16,0.5,4.7,[["half can, 200 g",200]]],
-["Hummus","leg",166,7.9,14,9.6,6,[["tbsp, 30 g",30]]],
-["Peanut butter","nut",588,25,20,50,6,[["tbsp, 16 g",16],["30 g",30]]],
-["Almonds","nut",579,21,22,50,12.5,[["handful, 28 g",28]]],
-["Walnuts","nut",654,15,14,65,6.7,[["handful, 28 g",28]]],
-["Cashews","nut",553,18,30,44,3.3,[["handful, 28 g",28]]],
-["Peanuts","nut",567,26,16,49,8.5,[["handful, 28 g",28]]],
-["Pumpkin seeds","nut",559,30,11,49,6,[["tbsp, 15 g",15]]],
-["Chia seeds","nut",486,17,42,31,34,[["tbsp, 12 g",12]]],
-["Olive oil","nut",884,0,0,100,0,[["tbsp, 14 g",14],["tsp, 5 g",5]]],
-["Coconut oil","nut",862,0,0,100,0,[["tbsp, 14 g",14]]],
-["Avocado","nut",160,2,8.5,14.7,6.7,[["medium, 150 g",150],["half, 75 g",75]]],
-["Mayonnaise","nut",680,1,0.6,75,0,[["tbsp, 14 g",14]]],
-["Broccoli, steamed","veg",35,2.4,7.2,0.4,3.3,[["portion, 90 g",90]]],
-["Spinach, raw","veg",23,2.9,3.6,0.4,2.2,[["handful, 30 g",30]]],
-["Kale","veg",49,4.3,8.8,0.9,3.6,[["handful, 40 g",40]]],
-["Carrot","veg",41,0.9,9.6,0.2,2.8,[["medium, 70 g",70]]],
-["Tomato","veg",18,0.9,3.9,0.2,1.2,[["medium, 120 g",120]]],
-["Cucumber","veg",15,0.7,3.6,0.1,0.5,[["5 cm piece, 60 g",60]]],
-["Bell pepper","veg",31,1,6,0.3,2.1,[["pepper, 120 g",120]]],
-["Onion","veg",40,1.1,9.3,0.1,1.7,[["medium, 110 g",110]]],
-["Courgette","veg",17,1.2,3.1,0.3,1,[["medium, 200 g",200]]],
-["Mushrooms","veg",22,3.1,3.3,0.3,1,[["handful, 70 g",70]]],
-["Green beans","veg",31,1.8,7,0.1,2.7,[["portion, 90 g",90]]],
-["Peas, frozen","veg",81,5.4,14,0.4,5.1,[["portion, 80 g",80]]],
-["Sweetcorn","veg",86,3.3,19,1.4,2,[["portion, 80 g",80]]],
-["Cauliflower","veg",25,1.9,5,0.3,2,[["portion, 100 g",100]]],
-["Lettuce","veg",15,1.4,2.9,0.2,1.3,[["bowl, 50 g",50]]],
-["Asparagus","veg",20,2.2,3.9,0.1,2.1,[["spears, 90 g",90]]],
-["Cabbage","veg",25,1.3,5.8,0.1,2.5,[["portion, 90 g",90]]],
-["Beetroot, cooked","veg",43,1.6,9.6,0.2,2.8,[["80 g",80]]],
-["Banana","fru",89,1.1,23,0.3,2.6,[["medium, 118 g",118]]],
-["Apple","fru",52,0.3,14,0.2,2.4,[["medium, 182 g",182]]],
-["Orange","fru",47,0.9,12,0.1,2.4,[["medium, 131 g",131]]],
-["Pear","fru",57,0.4,15,0.1,3.1,[["medium, 178 g",178]]],
-["Kiwi","fru",61,1.1,15,0.5,3,[["fruit, 75 g",75]]],
-["Strawberries","fru",32,0.7,7.7,0.3,2,[["bowl, 150 g",150]]],
-["Blueberries","fru",57,0.7,14,0.3,2.4,[["handful, 70 g",70]]],
-["Raspberries","fru",52,1.2,12,0.7,6.5,[["handful, 60 g",60]]],
-["Grapes","fru",69,0.7,18,0.2,0.9,[["handful, 80 g",80]]],
-["Mango","fru",60,0.8,15,0.4,1.6,[["cheek, 120 g",120]]],
-["Pineapple","fru",50,0.5,13,0.1,1.4,[["slice, 80 g",80]]],
-["Watermelon","fru",30,0.6,7.6,0.2,0.4,[["wedge, 200 g",200]]],
-["Dates, dried","fru",282,2.5,75,0.4,8,[["date, 8 g",8]]],
-["Raisins","fru",299,3.1,79,0.5,3.7,[["small box, 40 g",40]]],
-["Coffee, black","drk",1,0.1,0,0,0,[["mug, 250 ml",250]]],
-["Flat white","drk",62,3.3,4.9,3.4,0,[["cup, 180 ml",180]]],
-["Latte, whole milk","drk",56,3,4.5,3,0,[["small, 240 ml",240],["large, 400 ml",400]]],
-["Almond milk, unsweetened","drk",15,0.6,0.6,1.2,0.3,[["cup, 240 ml",240]]],
-["Oat milk","drk",46,0.8,7.4,1.5,0.8,[["cup, 240 ml",240]]],
-["Orange juice","drk",45,0.7,10,0.2,0.2,[["glass, 250 ml",250]]],
-["Cola","drk",42,0,10.6,0,0,[["can, 330 ml",330]]],
-["Diet cola","drk",0.3,0,0,0,0,[["can, 330 ml",330]]],
-["Beer, 4%","drk",43,0.5,3.6,0,0,[["pint, 568 ml",568],["bottle, 330 ml",330]]],
-["Red wine","drk",85,0.1,2.6,0,0,[["glass, 175 ml",175]]],
-["White wine","drk",82,0.1,2.6,0,0,[["glass, 175 ml",175]]],
-["Spirits, 40%","drk",231,0,0,0,0,[["single, 25 ml",25],["double, 50 ml",50]]],
-["Dark chocolate, 70%","snk",598,7.8,46,43,11,[["square, 10 g",10],["bar, 100 g",100]]],
-["Milk chocolate","snk",535,7.6,59,30,3.4,[["bar, 45 g",45]]],
-["Crisps","snk",536,7,53,34,4.4,[["small bag, 25 g",25]]],
-["Digestive biscuit","snk",471,6.7,63,21,2.9,[["biscuit, 15 g",15]]],
-["Croissant","snk",406,8.2,46,21,2.6,[["croissant, 60 g",60]]],
-["Doughnut","snk",421,4.9,51,22,1.4,[["doughnut, 70 g",70]]],
-["Ice cream, vanilla","snk",207,3.5,24,11,0.7,[["scoop, 65 g",65]]],
-["Popcorn, plain","snk",387,13,78,4.5,15,[["bowl, 25 g",25]]],
-["Protein bar","snk",350,30,35,10,8,[["bar, 60 g",60]]],
-["Flapjack","snk",430,5,58,20,3,[["piece, 70 g",70]]],
-["Pizza, cheese","mea",266,11,33,10,2.3,[["slice, 107 g",107]]],
-["Chicken curry, takeaway","mea",150,11,6,9,1.5,[["portion, 350 g",350]]],
-["Burrito","mea",206,9,25,7.5,2.5,[["burrito, 350 g",350]]],
-["Sushi roll","mea",143,5,28,1.5,1,[["6 pieces, 150 g",150]]],
-["Beef burger, fast food","mea",257,13,20,14,1.5,[["burger, 215 g",215]]],
-["Caesar salad, dressed","mea",190,8,6,15,1.5,[["bowl, 220 g",220]]],
-["Tomato pasta sauce","mea",55,1.7,8.6,1.5,1.7,[["half jar, 200 g",200]]],
-["Fish and chips","mea",240,13,25,11,2,[["portion, 400 g",400]]],
-["Soy sauce","con",53,8,4.9,0.1,0,[["tbsp, 16 ml",16]]],
-["Ketchup","con",101,1.2,25,0.1,0.3,[["tbsp, 17 g",17]]],
-["Honey","con",304,0.3,82,0,0.2,[["tsp, 7 g",7]]],
-["Sugar","con",387,0,100,0,0,[["tsp, 4 g",4]]],
-["Maple syrup","con",260,0,67,0.1,0,[["tbsp, 20 g",20]]],
-["Salad dressing, vinaigrette","con",449,0.4,2.5,49,0,[["tbsp, 15 g",15]]]
+  ["Chicken breast, cooked","pro",165,31,0,3.6,0,[["breast, 150 g",150],["100 g",100]],[1.0,0,74,256,15,1.0,29,1.0,0,0.1,0.3,4,9]],
+  ["Chicken breast, raw","pro",120,22.5,0,2.6,0,[["breast, 180 g",180]],[0.6,0,45,334,5,0.4,28,0.7,0,0.1,0.2,4,6]],
+  ["Chicken thigh, cooked","pro",209,26,0,10.9,0,[["thigh, 90 g",90]],[3.0,0,84,230,12,1.3,23,2.2,0,0.1,0.6,7,25]],
+  ["Chicken, rotisserie, no skin","pro",190,29,0,7.5,0,[2.0,0,330,240,14,1.1,25,1.8,0,0.1,0.4,5,15]],
+  ["Turkey breast, cooked","pro",135,30,0,1,0,[["slice, 30 g",30]],[0.3,0,60,300,12,0.7,30,1.3,0,0.1,0.4,6,5]],
+  ["Beef mince, 5% fat, cooked","pro",176,26,0,8,0,[["125 g",125]],[3.5,0,75,350,15,2.8,24,6.0,0,0.1,2.5,8,0]],
+  ["Beef mince, 20% fat, cooked","pro",254,26,0,16,0,[["125 g",125]],[6.3,0,78,290,24,2.4,20,5.8,0,0.1,2.4,8,0]],
+  ["Sirloin steak, cooked","pro",212,29,0,10,0,[["steak, 200 g",200]],[4.0,0,55,350,20,2.3,25,4.5,0,0.1,1.5,9,0]],
+  ["Pork loin, cooked","pro",187,27,0,8,0,[["chop, 150 g",150]],[2.8,0,60,420,20,0.9,28,2.4,0.6,0.6,0.6,2,2]],
+  ["Bacon, cooked","pro",541,37,1.4,42,0,[["rasher, 15 g",15]],[14,0,1717,565,11,1.4,33,3.5,0,0.4,1.0,2,11]],
+  ["Lamb chop, cooked","pro",294,25,0,21,0,[["chop, 110 g",110]],[9.0,0,72,310,17,1.9,24,4.4,0,0.1,2.6,18,0]],
+  ["Salmon fillet, cooked","pro",206,22,0,12,0,[["fillet, 130 g",130]],[2.5,0,61,384,15,0.5,30,0.6,3.9,13.1,3.2,26,58]],
+  ["Tuna, canned in water","pro",116,26,0,0.8,0,[["can, drained 112 g",112]],[0.2,0,247,237,11,1.0,29,0.6,0,1.7,2.5,4,5]],
+  ["Tuna steak, cooked","pro",184,30,0,6,0,[["steak, 150 g",150]],[1.6,0,50,441,10,1.3,64,0.8,0,6.7,2.2,2,20]],
+  ["Cod, cooked","pro",105,23,0,0.9,0,[["fillet, 140 g",140]],[0.2,0,78,244,18,0.5,38,0.6,1,1.2,1.0,8,12]],
+  ["Prawns, cooked","pro",99,24,0.2,0.3,0,[["100 g",100]],[0.1,0,805,220,70,0.5,39,1.6,0,0.1,1.4,19,54]],
+  ["Sardines, canned in oil","pro",208,25,0,11,0,[["can, 90 g",90]],[1.5,0,505,397,382,2.9,39,1.3,0,4.8,8.9,10,32]],
+  ["Mackerel, cooked","pro",262,24,0,18,0,[["fillet, 110 g",110]],[4.2,0,83,401,15,1.6,97,0.9,0.4,13.8,19.0,2,54]],
+  ["Egg, whole","pro",143,12.6,0.7,9.5,0,[["large egg, 50 g",50],["medium egg, 44 g",44]],[3.1,0.4,142,138,56,1.8,12,1.3,0,2.0,1.1,47,160]],
+  ["Egg white","pro",52,10.9,0.7,0.2,0,[["white of 1 egg, 33 g",33]],[0,0.7,166,163,7,0.1,11,0,0,0,0.1,4,0]],
+  ["Tofu, firm","pro",144,17,2.8,9,2,[["block, 200 g",200]],[1.3,0.6,14,146,350,2.7,58,1.6,0.1,0,0,19,0]],
+  ["Tempeh","pro",192,20,7.6,11,0,[["100 g",100]],[2.5,0,9,412,111,2.7,81,1.1,0,0,0.1,24,0]],
+  ["Whey protein powder","pro",400,80,8,6,0,[["scoop, 30 g",30]],[2.0,5,350,500,450,1.0,60,3.0,0,0,2.0,30,0]],
+  ["Protein shake, ready to drink","pro",42,8,1.5,0.5,0,[["bottle, 330 ml",330]],[0.2,1.0,60,150,120,0.4,20,1.0,0,0.4,0.4,10,30]],
+  ["Greek yogurt, 0% fat","dai",59,10,3.6,0.4,0,[["pot, 170 g",170],["100 g",100]],[0.1,3.6,36,141,110,0.1,11,0.5,0,0,0.8,7,1]],
+  ["Greek yogurt, 5% fat","dai",97,9,4,5,0,[["pot, 170 g",170]],[3.2,4,35,136,100,0.1,11,0.5,0,0,0.6,7,27]],
+  ["Cottage cheese, low fat","dai",98,11,3.4,4.3,0,[["pot, 200 g",200]],[2.7,3.4,364,86,61,0.1,5,0.4,0,0,0.6,12,37]],
+  ["Milk, whole","dai",61,3.2,4.8,3.3,0,[["cup, 240 ml",240],["splash, 30 ml",30]],[1.9,4.8,43,132,113,0,10,0.4,0,1.3,0.5,5,46]],
+  ["Milk, semi-skimmed","dai",47,3.4,4.8,1.7,0,[["cup, 240 ml",240]],[1.1,4.8,44,150,120,0,11,0.4,0,1.2,0.5,5,25]],
+  ["Milk, skimmed","dai",34,3.4,5,0.1,0,[["cup, 240 ml",240]],[0.1,5,42,156,125,0,11,0.4,0,1.3,0.5,5,61]],
+  ["Cheddar cheese","dai",403,25,1.3,33,0,[["slice, 25 g",25],["30 g",30]],[21,0.5,621,98,721,0.7,28,3.1,0,0.6,1.1,27,265]],
+  ["Mozzarella","dai",280,22,2.2,20,0,[["ball, 125 g",125]],[12,1.1,627,76,505,0.4,20,2.9,0,0.4,2.3,7,179]],
+  ["Parmesan","dai",392,36,3.2,26,0,[["tbsp grated, 5 g",5]],[17,0.9,1529,125,1184,0.8,38,2.8,0,0.5,1.2,7,207]],
+  ["Feta","dai",264,14,4.1,21,0,[["30 g",30]],[14,4.1,1116,62,493,0.7,19,2.9,0,0.4,1.7,32,125]],
+  ["Halloumi","dai",321,22,2,25,0,[["slice, 30 g",30]],[17,2,1250,90,700,0.3,25,2.5,0,0.3,1.0,10,190]],
+  ["Butter","dai",717,0.9,0.1,81,0,[["tsp, 5 g",5],["pat, 10 g",10]],[51,0.1,643,24,24,0,2,0.1,0,1.5,0.2,3,684]],
+  ["Double cream","dai",449,2.1,2.8,48,0,[["tbsp, 15 ml",15]],[30,2.8,32,75,65,0,7,0.2,0.6,1.1,0.2,4,437]],
+  ["Rice, white, cooked","grn",130,2.7,28,0.3,0.4,[["cup, 158 g",158],["100 g",100]],[0.1,0.1,1,35,10,0.2,12,0.5,0,0,0,58,0]],
+  ["Rice, brown, cooked","grn",123,2.7,26,1,1.6,[["cup, 195 g",195]],[0.3,0.4,4,86,10,0.6,44,1.1,0,0,0,4,0]],
+  ["Rice, white, dry","grn",365,7,80,0.7,1.3,[["75 g dry",75]],[0.2,0.1,5,115,28,0.8,35,1.1,0,0,0,231,0]],
+  ["Pasta, cooked","grn",158,5.8,31,0.9,1.8,[["bowl, 220 g",220],["100 g",100]],[0.2,0.6,1,44,7,0.5,18,0.5,0,0,0,7,0]],
+  ["Pasta, dry","grn",371,13,75,1.5,3.2,[["75 g dry",75],["100 g dry",100]],[0.3,2.7,6,223,21,1.8,53,1.4,0,0,0,18,0]],
+  ["Bread, white","grn",266,9,49,3.3,2.7,[["slice, 36 g",36]],[0.7,5,490,120,150,3.6,23,0.7,0,0,0,80,0]],
+  ["Bread, wholemeal","grn",247,13,41,3.4,7,[["slice, 40 g",40]],[0.7,4,450,250,60,2.9,76,1.8,0,0,0,42,0]],
+  ["Sourdough bread","grn",270,11,52,2,2.4,[["slice, 50 g",50]],[0.4,2,540,110,40,2.6,25,0.8,0,0,0,60,0]],
+  ["Pita bread","grn",275,9,55,1.2,2.2,[["pita, 60 g",60]],[0.2,1.3,536,120,86,2.9,26,0.8,0,0,0,85,0]],
+  ["Bagel","grn",257,10,50,1.5,2.1,[["bagel, 95 g",95]],[0.3,5,440,95,80,3.3,25,0.9,0,0,0,100,0]],
+  ["Tortilla wrap, flour","grn",306,8,51,7,3,[["wrap, 45 g",45]],[1.8,2,650,130,150,3.0,20,0.6,0,0,0,60,0]],
+  ["Oats, rolled, dry","grn",389,16.9,66,6.9,10.6,[["40 g",40],["60 g",60]],[1.2,1,2,429,54,4.7,177,4.0,0,0,0,56,0]],
+  ["Weetabix","grn",362,12,68,2,10,[["2 biscuits, 38 g",38]],[0.4,4.4,270,400,35,12,120,2.0,0,0,1.4,250,0]],
+  ["Cornflakes","grn",357,7.5,84,0.4,3,[["bowl, 40 g",40]],[0.1,8,729,100,7,8.0,10,0.4,20,0,2.0,200,300]],
+  ["Granola","grn",471,10,64,20,7,[["50 g",50]],[3.0,20,30,340,70,3.0,110,2.5,0,0,0,40,0]],
+  ["Quinoa, cooked","grn",120,4.4,21,1.9,2.8,[["cup, 185 g",185]],[0.2,0.9,7,172,17,1.5,64,1.1,0,0,0,42,0]],
+  ["Couscous, cooked","grn",112,3.8,23,0.2,1.4,[["cup, 157 g",157]],[0,0.1,5,58,8,0.4,8,0.2,0,0,0,15,0]],
+  ["Egg noodles, cooked","grn",138,4.5,25,2.1,1.2,[["nest, 150 g",150]],[0.4,0.4,5,38,12,1.3,19,0.5,0,0,0.1,54,9]],
+  ["Potato, boiled","grn",87,2,20,0.1,1.8,[["medium, 170 g",170]],[0,0.9,4,379,8,0.3,20,0.3,13,0,0,10,0]],
+  ["Potato, baked","grn",93,2.5,21,0.1,2.2,[["medium, 200 g",200]],[0,1.2,10,535,15,1.1,28,0.4,10,0,0,28,0]],
+  ["Sweet potato, baked","grn",90,2,21,0.1,3.3,[["medium, 150 g",150]],[0,6.5,36,475,38,0.7,27,0.3,20,0,0,6,961]],
+  ["Oven chips","grn",170,2.6,26,6,2.5,[["portion, 150 g",150]],[1.0,0.5,290,500,15,0.7,25,0.4,8,0,0,25,0]],
+  ["Rice cakes","grn",387,8,81,3,3,[["cake, 9 g",9]],[0.6,0.5,30,160,10,0.5,60,1.3,0,0,0,10,0]],
+  ["Lentils, cooked","leg",116,9,20,0.4,7.9,[["cup, 198 g",198]],[0.1,1.8,2,369,19,3.3,36,1.3,1.5,0,0,181,0]],
+  ["Chickpeas, cooked","leg",164,8.9,27,2.6,7.6,[["can, drained 240 g",240]],[0.3,4.8,240,291,49,2.9,48,1.5,1.3,0,0,172,1]],
+  ["Black beans, cooked","leg",132,8.9,24,0.5,8.7,[["cup, 172 g",172]],[0.1,0.3,1,355,27,2.1,70,1.1,0,0,0,149,0]],
+  ["Kidney beans, cooked","leg",127,8.7,23,0.5,6.4,[["cup, 177 g",177]],[0.1,0.3,2,403,28,2.9,45,1.0,1.2,0,0,130,0]],
+  ["Baked beans","leg",94,4.8,16,0.5,4.7,[["half can, 200 g",200]],[0.1,5.0,440,300,45,1.4,31,0.6,0,0,0,29,0]],
+  ["Hummus","leg",166,7.9,14,9.6,6,[["tbsp, 30 g",30]],[1.4,0.3,379,228,38,2.4,71,1.8,0,0,0,83,2]],
+  ["Peanut butter","nut",588,25,20,50,6,[["tbsp, 16 g",16],["30 g",30]],[10,9,429,649,43,1.9,154,2.9,0,0,0,92,0]],
+  ["Almonds","nut",579,21,22,50,12.5,[["handful, 28 g",28]],[3.8,4.4,1,733,269,3.7,270,3.1,0,0,0,44,0]],
+  ["Walnuts","nut",654,15,14,65,6.7,[["handful, 28 g",28]],[6.1,2.6,2,441,98,2.9,158,3.1,1.3,0,0,98,1]],
+  ["Cashews","nut",553,18,30,44,3.3,[["handful, 28 g",28]],[7.8,5.9,12,660,37,6.7,292,5.8,0.5,0,0,25,0]],
+  ["Peanuts","nut",567,26,16,49,8.5,[["handful, 28 g",28]],[6.8,4.7,18,705,92,4.6,168,3.3,0,0,0,240,0]],
+  ["Pumpkin seeds","nut",559,30,11,49,6,[["tbsp, 15 g",15]],[8.7,1.4,7,809,46,8.8,592,7.8,1.9,0,0,58,1]],
+  ["Chia seeds","nut",486,17,42,31,34,[["tbsp, 12 g",12]],[3.3,0,16,407,631,7.7,335,4.6,1.6,0,0,49,0]],
+  ["Olive oil","nut",884,0,0,100,0,[["tbsp, 14 g",14],["tsp, 5 g",5]],[14,0,2,1,1,0.6,0,0,0,0,0,0,0]],
+  ["Coconut oil","nut",862,0,0,100,0,[["tbsp, 14 g",14]],[87,0,0,0,0,0,0,0,0,0,0,0,0]],
+  ["Avocado","nut",160,2,8.5,14.7,6.7,[["medium, 150 g",150],["half, 75 g",75]],[2.1,0.7,7,485,12,0.6,29,0.6,10,0,0,81,7]],
+  ["Mayonnaise","nut",680,1,0.6,75,0,[["tbsp, 14 g",14]],[12,0.6,635,20,8,0.2,1,0.1,0,0,0.3,5,36]],
+  ["Broccoli, steamed","veg",35,2.4,7.2,0.4,3.3,[["portion, 90 g",90]],[0.1,1.4,41,293,40,0.7,21,0.4,65,0,0,108,77]],
+  ["Spinach, raw","veg",23,2.9,3.6,0.4,2.2,[["handful, 30 g",30]],[0.1,0.4,79,558,99,2.7,79,0.5,28,0,0,194,469]],
+  ["Kale","veg",49,4.3,8.8,0.9,3.6,[["handful, 40 g",40]],[0.1,2.3,38,491,150,1.5,47,0.6,120,0,0,141,500]],
+  ["Carrot","veg",41,0.9,9.6,0.2,2.8,[["medium, 70 g",70]],[0,4.7,69,320,33,0.3,12,0.2,5.9,0,0,19,835]],
+  ["Tomato","veg",18,0.9,3.9,0.2,1.2,[["medium, 120 g",120]],[0,2.6,5,237,10,0.3,11,0.2,14,0,0,15,42]],
+  ["Cucumber","veg",15,0.7,3.6,0.1,0.5,[["5 cm piece, 60 g",60]],[0,1.7,2,147,16,0.3,13,0.2,2.8,0,0,7,5]],
+  ["Bell pepper","veg",31,1,6,0.3,2.1,[["pepper, 120 g",120]],[0.1,4.2,4,211,7,0.4,12,0.3,128,0,0,46,157]],
+  ["Onion","veg",40,1.1,9.3,0.1,1.7,[["medium, 110 g",110]],[0,4.2,4,146,23,0.2,10,0.2,7.4,0,0,19,0]],
+  ["Courgette","veg",17,1.2,3.1,0.3,1,[["medium, 200 g",200]],[0.1,2.5,8,261,16,0.4,18,0.3,18,0,0,24,10]],
+  ["Mushrooms","veg",22,3.1,3.3,0.3,1,[["handful, 70 g",70]],[0,2,5,318,3,0.5,9,0.5,2.1,0.2,0,17,0]],
+  ["Green beans","veg",31,1.8,7,0.1,2.7,[["portion, 90 g",90]],[0,3.3,6,211,37,1.0,25,0.2,12,0,0,33,35]],
+  ["Peas, frozen","veg",81,5.4,14,0.4,5.1,[["portion, 80 g",80]],[0.1,5,108,153,23,1.5,22,0.8,18,0,0,50,48]],
+  ["Sweetcorn","veg",86,3.3,19,1.4,2,[["portion, 80 g",80]],[0.2,3.2,15,270,2,0.5,37,0.6,7,0,0,42,11]],
+  ["Cauliflower","veg",25,1.9,5,0.3,2,[["portion, 100 g",100]],[0.1,1.9,30,299,22,0.4,15,0.3,48,0,0,57,0]],
+  ["Lettuce","veg",15,1.4,2.9,0.2,1.3,[["bowl, 50 g",50]],[0,0.8,28,194,36,0.9,13,0.2,9.2,0,0,38,370]],
+  ["Asparagus","veg",20,2.2,3.9,0.1,2.1,[["spears, 90 g",90]],[0,1.9,2,202,24,2.1,14,0.5,5.6,0,0,52,38]],
+  ["Cabbage","veg",25,1.3,5.8,0.1,2.5,[["portion, 90 g",90]],[0,3.2,18,170,40,0.5,12,0.2,37,0,0,43,5]],
+  ["Beetroot, cooked","veg",43,1.6,9.6,0.2,2.8,[["80 g",80]],[0,8,77,305,16,0.8,23,0.4,3.6,0,0,80,2]],
+  ["Banana","fru",89,1.1,23,0.3,2.6,[["medium, 118 g",118]],[0.1,12,1,358,5,0.3,27,0.2,8.7,0,0,20,3]],
+  ["Apple","fru",52,0.3,14,0.2,2.4,[["medium, 182 g",182]],[0,10,1,107,6,0.1,5,0,4.6,0,0,3,3]],
+  ["Orange","fru",47,0.9,12,0.1,2.4,[["medium, 131 g",131]],[0,9.4,0,181,40,0.1,10,0.1,53,0,0,30,11]],
+  ["Pear","fru",57,0.4,15,0.1,3.1,[["medium, 178 g",178]],[0,9.8,1,116,9,0.2,7,0.1,4.3,0,0,7,1]],
+  ["Kiwi","fru",61,1.1,15,0.5,3,[["fruit, 75 g",75]],[0,9,3,312,34,0.3,17,0.1,93,0,0,25,4]],
+  ["Strawberries","fru",32,0.7,7.7,0.3,2,[["bowl, 150 g",150]],[0,4.9,1,153,16,0.4,13,0.1,59,0,0,24,1]],
+  ["Blueberries","fru",57,0.7,14,0.3,2.4,[["handful, 70 g",70]],[0,10,1,77,6,0.3,6,0.2,9.7,0,0,6,3]],
+  ["Raspberries","fru",52,1.2,12,0.7,6.5,[["handful, 60 g",60]],[0,4.4,1,151,25,0.7,22,0.4,26,0,0,21,2]],
+  ["Grapes","fru",69,0.7,18,0.2,0.9,[["handful, 80 g",80]],[0.1,16,2,191,10,0.4,7,0.1,3.2,0,0,2,3]],
+  ["Mango","fru",60,0.8,15,0.4,1.6,[["cheek, 120 g",120]],[0.1,14,1,168,11,0.2,10,0.1,36,0,0,43,54]],
+  ["Pineapple","fru",50,0.5,13,0.1,1.4,[["slice, 80 g",80]],[0,9.9,1,109,13,0.3,12,0.1,48,0,0,18,3]],
+  ["Watermelon","fru",30,0.6,7.6,0.2,0.4,[["wedge, 200 g",200]],[0,6.2,1,112,7,0.2,10,0.1,8.1,0,0,3,28]],
+  ["Dates, dried","fru",282,2.5,75,0.4,8,[["date, 8 g",8]],[0,63,2,656,39,1.0,43,0.3,0.4,0,0,15,0]],
+  ["Raisins","fru",299,3.1,79,0.5,3.7,[["small box, 40 g",40]],[0.1,59,11,749,50,1.9,32,0.2,2.3,0,0,5,0]],
+  ["Coffee, black","drk",1,0.1,0,0,0,[["mug, 250 ml",250]],[0,0,2,49,2,0,3,0,0,0,0,0,0]],
+  ["Flat white","drk",62,3.3,4.9,3.4,0,[["cup, 180 ml",180]],[2.1,4.9,45,150,120,0.1,12,0.4,1,0.5,0.4,5,30]],
+  ["Latte, whole milk","drk",56,3,4.5,3,0,[["small, 240 ml",240],["large, 400 ml",400]],[1.9,4.5,40,140,110,0,11,0.4,1,0.5,0.4,5,28]],
+  ["Almond milk, unsweetened","drk",15,0.6,0.6,1.2,0.3,[["cup, 240 ml",240]],[0.1,0.3,65,50,184,0.3,7,0.1,0,1.0,0.4,2,50]],
+  ["Oat milk","drk",46,0.8,7.4,1.5,0.8,[["cup, 240 ml",240]],[0.2,3.3,50,160,120,0.2,10,0.3,0,1.1,0.4,2,50]],
+  ["Orange juice","drk",45,0.7,10,0.2,0.2,[["glass, 250 ml",250]],[0,8.4,1,200,11,0.2,11,0.1,50,0,0,30,2]],
+  ["Cola","drk",42,0,10.6,0,0,[["can, 330 ml",330]],[0,10.6,4,2,2,0.1,0,0,0,0,0,0,0]],
+  ["Diet cola","drk",0.3,0,0,0,0,[["can, 330 ml",330]],[0,0,4,6,3,0,0,0,0,0,0,0,0]],
+  ["Beer, 4%","drk",43,0.5,3.6,0,0,[["pint, 568 ml",568],["bottle, 330 ml",330]],[0,0.1,4,27,4,0,6,0,0,0,0.02,6,0]],
+  ["Red wine","drk",85,0.1,2.6,0,0,[["glass, 175 ml",175]],[0,0.6,4,127,8,0.5,12,0.1,0,0,0,1,0]],
+  ["White wine","drk",82,0.1,2.6,0,0,[["glass, 175 ml",175]],[0,1.0,5,71,9,0.3,10,0.1,0,0,0,0,0]],
+  ["Spirits, 40%","drk",231,0,0,0,0,[["single, 25 ml",25],["double, 50 ml",50]],[0,0,1,2,0,0,0,0,0,0,0,0,0]],
+  ["Dark chocolate, 70%","snk",598,7.8,46,43,11,[["square, 10 g",10],["bar, 100 g",100]],[24,24,20,715,73,12,228,3.3,0,0,0,12,2]],
+  ["Milk chocolate","snk",535,7.6,59,30,3.4,[["bar, 45 g",45]],[19,52,79,372,189,2.4,63,2.3,0,0,0.8,11,50]],
+  ["Crisps","snk",536,7,53,34,4.4,[["small bag, 25 g",25]],[3.1,0.5,525,1275,24,1.6,68,1.1,31,0,0,45,0]],
+  ["Digestive biscuit","snk",471,6.7,63,21,2.9,[["biscuit, 15 g",15]],[9.5,17,600,180,60,2.2,25,0.6,0,0,0,20,0]],
+  ["Croissant","snk",406,8.2,46,21,2.6,[["croissant, 60 g",60]],[12,11,480,118,37,2.0,15,0.6,0,0.1,0.2,100,120]],
+  ["Doughnut","snk",421,4.9,51,22,1.4,[["doughnut, 70 g",70]],[6.0,23,350,100,60,2.0,15,0.5,0,0,0.1,60,10]],
+  ["Ice cream, vanilla","snk",207,3.5,24,11,0.7,[["scoop, 65 g",65]],[7.0,21,80,199,128,0.1,14,0.7,0.6,0.2,0.4,5,118]],
+  ["Popcorn, plain","snk",387,13,78,4.5,15,[["bowl, 25 g",25]],[0.6,0.5,8,329,7,2.7,144,3.1,0,0,0,31,1]],
+  ["Protein bar","snk",350,30,35,10,8,[["bar, 60 g",60]],[4.0,10,300,400,300,3.0,80,3.0,0,0,1.0,40,50]],
+  ["Flapjack","snk",430,5,58,20,3,[["piece, 70 g",70]],[9.0,30,150,250,40,2.0,60,1.2,0,0,0,20,60]],
+  ["Pizza, cheese","mea",266,11,33,10,2.3,[["slice, 107 g",107]],[4.5,3.6,598,180,200,2.3,24,1.4,1,0.1,0.4,60,70]],
+  ["Chicken curry, takeaway","mea",150,11,6,9,1.5,[["portion, 350 g",350]],[3.5,2.0,400,230,40,1.2,25,1.0,5,0.1,0.3,15,50]],
+  ["Burrito","mea",206,9,25,7.5,2.5,[["burrito, 350 g",350]],[2.8,2.5,500,250,90,1.8,30,1.2,4,0.1,0.4,40,40]],
+  ["Sushi roll","mea",143,5,28,1.5,1,[["6 pieces, 150 g",150]],[0.3,4.5,350,90,15,0.6,15,0.5,2,0.6,0.6,10,10]],
+  ["Beef burger, fast food","mea",257,13,20,14,1.5,[["burger, 215 g",215]],[5.5,4.5,450,200,90,1.9,22,2.0,1,0.1,1.0,35,30]],
+  ["Caesar salad, dressed","mea",190,8,6,15,1.5,[["bowl, 220 g",220]],[3.0,1.5,450,180,90,0.8,14,0.6,8,0.2,0.3,50,150]],
+  ["Tomato pasta sauce","mea",55,1.7,8.6,1.5,1.7,[["half jar, 200 g",200]],[0.2,6.0,400,350,25,1.0,18,0.3,10,0,0,12,60]],
+  ["Fish and chips","mea",240,13,25,11,2,[["portion, 400 g",400]],[1.6,0.6,400,420,40,0.9,30,0.5,6,2.0,0.8,25,10]],
+  ["Soy sauce","con",53,8,4.9,0.1,0,[["tbsp, 16 ml",16]],[0,0.4,5493,212,20,1.5,43,0.5,0,0,0,14,0]],
+  ["Ketchup","con",101,1.2,25,0.1,0.3,[["tbsp, 17 g",17]],[0,22,907,380,15,0.3,13,0.2,4.1,0,0,9,24]],
+  ["Honey","con",304,0.3,82,0,0.2,[["tsp, 7 g",7]],[0,82,4,52,6,0.4,2,0.2,0.5,0,0,2,0]],
+  ["Sugar","con",387,0,100,0,0,[["tsp, 4 g",4]],[0,100,1,2,1,0,0,0,0,0,0,0,0]],
+  ["Maple syrup","con",260,0,67,0.1,0,[["tbsp, 20 g",20]],[0,60,12,212,102,0.1,21,1.5,0,0,0,0,0]],
+  ["Salad dressing, vinaigrette","con",449,0.4,2.5,49,0,[["tbsp, 15 g",15]],[7.0,2.4,800,20,5,0.2,2,0.1,0,0,0,2,0]]
 ];
+const ZM=()=>[0,0,0,0,0,0,0,0,0,0,0,0,0];
 const BUILTIN = RAW_DB.map((r,i)=>({id:"b"+i,n:r[0],cat:r[1],kcal:r[2],p:r[3],c:r[4],f:r[5],
-  fib:r[6]||0,srv:r[7]||[["100 g",100]],own:false}));
+  fib:r[6]||0,srv:r[7]||[["100 g",100]],mi:r[8]||ZM(),own:false}));
+
+/* Micronutrients, in the order they are stored on an entry. `cap` ones are ceilings to stay
+   under; the rest are daily targets to reach. Figures are the US DRI / dietary-guideline
+   values for adults, split by sex where they differ. */
+const MICROS=[
+  {k:"sat",n:"Saturated fat",u:"g",cap:true,pct:0.10,per:9},
+  {k:"sug",n:"Sugars",u:"g",cap:true,pct:0.10,per:4},
+  {k:"na",n:"Sodium",u:"mg",cap:true,v:2300},
+  {k:"ka",n:"Potassium",u:"mg",m:3400,f:2600},
+  {k:"ca",n:"Calcium",u:"mg",v:1000},
+  {k:"fe",n:"Iron",u:"mg",m:8,f:18},
+  {k:"mg",n:"Magnesium",u:"mg",m:400,f:310},
+  {k:"zn",n:"Zinc",u:"mg",m:11,f:8},
+  {k:"vc",n:"Vitamin C",u:"mg",m:90,f:75},
+  {k:"vd",n:"Vitamin D",u:"\u00b5g",v:15},
+  {k:"b12",n:"Vitamin B12",u:"\u00b5g",v:2.4},
+  {k:"fol",n:"Folate",u:"\u00b5g",v:400},
+  {k:"va",n:"Vitamin A",u:"\u00b5g",m:900,f:700}
+];
+const MI_INDEX={}; MICROS.forEach((m,i)=>MI_INDEX[m.k]=i);
+function microTargets(p,kcal){
+  return MICROS.map(m=>({...m,t:m.pct?kcal*m.pct/m.per:(m.v!=null?m.v:(p.sex==="f"?m.f:m.m))}));
+}
 
 /* ---------- small helpers ---------- */
 const $ = s => document.querySelector(s);
@@ -760,7 +823,7 @@ function slotNow(){ const h=new Date().getHours();
 
 /* ---------- state ---------- */
 const DEFAULTS={sex:"m",age:30,height:178,act:"1.375",units:"metric",goal:"lose",
-  goalW:null,rate:-0.5,prot:1.9,fat:0.8,win:28,kcalKg:7700};
+  startW:null,goalW:null,rate:-0.5,prot:1.9,fat:0.8,win:28,kcalKg:7700};
 const S={profile:{...DEFAULTS},days:new Map(),foods:[],meals:[],
   cur:TODAY(),tab:"today",ready:false,writable:true,mode:"local",sample:null,sampleImgs:false};
 
@@ -782,7 +845,7 @@ function queueDay(k){
     pending.delete(k);
     const d=S.days.get(k); if(!d) return;
     try{ await DB.doc("days/"+k).set({date:k,entries:d.entries||[],
-      weight:d.weight==null?null:d.weight,note:d.note||""}); }
+      weight:d.weight==null?null:d.weight,stats:d.stats||null,note:d.note||""}); }
     catch(e){ handleWriteErr(e); }
   },420));
 }
@@ -827,14 +890,19 @@ function storeLine(){
 /* ---------- day accessors ---------- */
 function getDay(k,make){
   let d=S.days.get(k);
-  if(!d&&make){ d={date:k,entries:[],weight:null,note:""}; S.days.set(k,d); }
+  if(!d&&make){ d={date:k,entries:[],weight:null,stats:null,note:""}; S.days.set(k,d); }
   return d;
 }
 function dayTotals(k){
-  const d=S.days.get(k); const t={kcal:0,p:0,c:0,f:0,fib:0,n:0};
+  const d=S.days.get(k); const t={kcal:0,p:0,c:0,f:0,fib:0,n:0,mi:ZM(),miKcal:0};
   if(!d||!d.entries) return t;
   for(const e of d.entries){ t.kcal+=e.kcal||0; t.p+=e.p||0; t.c+=e.c||0; t.f+=e.f||0;
-    t.fib+=e.fib||0; t.n++; }
+    t.fib+=e.fib||0; t.n++;
+    if(Array.isArray(e.mi)&&e.mi.length===13){
+      let any=false;
+      for(let i=0;i<13;i++){ const v=+e.mi[i]||0; t.mi[i]+=v; if(v>0) any=true; }
+      if(any) t.miKcal+=e.kcal||0;
+    } }
   return t;
 }
 function sortedKeys(){ return [...S.days.keys()].sort(); }
@@ -845,6 +913,10 @@ const wIn=kg=>metric()?kg:kg*LB;                 // kg -> display
 const wOut=v=>metric()?v:v/LB;                   // display -> kg
 const wUnit=()=>metric()?"kg":"lb";
 const hUnit=()=>metric()?"cm":"in";
+const lIn=cm=>metric()?cm:cm*IN;                 // cm -> display
+const lOut=v=>metric()?v:v/IN;                   // display -> cm
+const BODY=[["waist","Waist"],["hips","Hips"],["chest","Chest"],["arm","Arm"],
+  ["thigh","Thigh"],["neck","Neck"],["bf","Body fat"]];
 const kcalPerW=()=>metric()?(S.profile.kcalKg||7700):KPK_LB;
 
 /* ==========================================================================
@@ -856,23 +928,51 @@ function mifflin(p,kg){
   return p.sex==="f"?base-161:base+5;
 }
 
-/* Exponentially weighted trend over every calendar day in range. */
+/* One row per calendar day. Gaps between weigh-ins are filled by straight-line
+   interpolation before the exponential smoothing, so weighing weekly produces the same
+   trend slope as weighing daily — just with less noise rejection. */
 function buildSeries(){
   const keys=sortedKeys();
   if(!keys.length) return [];
   const first=keys[0], last=TODAY();
   const span=Math.max(0,daysBetween(first,last));
-  const out=[]; let trend=null; const A=0.1;
+  const rows=[];
   for(let i=0;i<=span;i++){
     const k=addDays(first,i);
     const d=S.days.get(k);
     const t=d?dayTotals(k):null;
-    const w=d&&d.weight!=null?d.weight:null;
-    if(w!=null) trend = trend==null ? w : trend+A*(w-trend);
-    out.push({k,kcal:t&&t.n?t.kcal:null,weight:w,trend,
-      logged:!!(t&&t.n),dow:fromKey(k).getDay()});
+    rows.push({k,kcal:t&&t.n?t.kcal:null,mi:t?t.mi:null,miKcal:t?t.miKcal:0,
+      weight:d&&d.weight!=null?d.weight:null,stats:d&&d.stats||null,
+      logged:!!(t&&t.n),dow:fromKey(k).getDay(),trend:null,filled:null});
   }
-  return out;
+  const marks=[]; rows.forEach((r,i)=>{ if(r.weight!=null) marks.push(i); });
+  if(marks.length){
+    for(let j=0;j<marks.length;j++){
+      const a=marks[j]; rows[a].filled=rows[a].weight;
+      if(j+1<marks.length){
+        const b=marks[j+1], gap=b-a;
+        for(let i=a+1;i<b;i++)
+          rows[i].filled=rows[a].weight+(rows[b].weight-rows[a].weight)*(i-a)/gap;
+      }
+    }
+    const tail=marks[marks.length-1];
+    for(let i=tail+1;i<rows.length;i++) rows[i].filled=rows[tail].weight;
+    let trend=null; const A=0.1;
+    for(let i=marks[0];i<rows.length;i++){
+      const w=rows[i].filled;
+      trend = trend==null ? w : trend+A*(w-trend);
+      rows[i].trend=trend;
+    }
+  }
+  return rows;
+}
+function lastWeighIndex(series,upTo){
+  for(let i=Math.min(upTo==null?series.length-1:upTo,series.length-1);i>=0;i--)
+    if(series[i].weight!=null) return i;
+  return -1;
+}
+function refWeight(p){
+  return p.startW!=null?wOut(p.startW):(p.goalW!=null?wOut(p.goalW):wOut(80));
 }
 /* Least-squares slope per day over a trend window. */
 function slopePerDay(series,from,to){
@@ -899,23 +999,27 @@ function burnAt(series,end,p){
   const win=clamp(p.win||28,10,90);
   const start=Math.max(0,end-win+1);
   const n=end-start+1;
-  const kg=currentWeightUpTo(series,end)||wOut(80);
+  const kg=currentWeightUpTo(series,end)||refWeight(p);
   const prior=mifflin(p,kg)*parseFloat(p.act||1.375);
-  let logged=0,sum=0;
+  let logged=0,sum=0,weighIns=0,wFirst=-1,wLast=-1;
   for(let i=start;i<=end;i++){ const s=series[i];
-    if(s&&s.kcal!=null){ logged++; sum+=s.kcal; } }
+    if(s&&s.kcal!=null){ logged++; sum+=s.kcal; }
+    if(s&&s.weight!=null){ weighIns++; if(wFirst<0) wFirst=i; wLast=i; } }
   const coverage=n?logged/n:0;
-  const slope=slopePerDay(series,start,end);
-  if(n<10||logged<7||coverage<0.5||slope==null)
-    return {tdee:prior,prior,measured:null,coverage,days:n,logged,conf:"low",slope};
+  const wSpan=wLast-wFirst;
+  const slope=wLast>=0?slopePerDay(series,start,wLast):null;
+  if(n<10||logged<7||coverage<0.5||weighIns<2||wSpan<10||slope==null)
+    return {tdee:prior,prior,measured:null,coverage,days:n,logged,weighIns,wSpan,
+      conf:"low",slope};
   const meanIntake=sum/logged;
   let measured=meanIntake-slope*kcalPerW();
   measured=clamp(measured,prior*0.6,prior*1.7);
   const effective=logged*Math.min(1,coverage/0.85);
   const w=effective/(effective+12);
   const tdee=prior*(1-w)+measured*w;
-  const conf=effective>=20?"high":effective>=12?"medium":"low";
-  return {tdee,prior,measured,coverage,days:n,logged,conf,slope,meanIntake,blend:w};
+  const conf=effective>=20&&weighIns>=4?"high":effective>=12?"medium":"low";
+  return {tdee,prior,measured,coverage,days:n,logged,weighIns,wSpan,conf,slope,
+    meanIntake,blend:w};
 }
 function currentWeightUpTo(series,end){
   for(let i=Math.min(end,series.length-1);i>=0;i--) if(series[i].trend!=null) return series[i].trend;
@@ -931,7 +1035,7 @@ function model(){
     {tdee:mifflin(p,wOut(80))*parseFloat(p.act||1.375),prior:null,measured:null,
      coverage:0,days:0,logged:0,conf:"low",slope:null};
   const kg=currentWeight(series);
-  const refKg=kg||(p.goalW!=null?wOut(p.goalW):wOut(80));
+  const refKg=kg||refWeight(p);
   const rateKg=p.goal==="maintain"?0:wOut(p.rate||0);
   let target=burn.tdee+rateKg*kcalPerW()/7;
   const bmr=mifflin(p,refKg);
@@ -954,9 +1058,12 @@ function model(){
       projection={weeks,date:d};
     } else if(Math.abs(need)<=0.5) projection={weeks:0,date:null};
   }
-  return {p,series,burn,kg,refKg,target,bmr,floored,rateKg,
-    macro:{p:protG,c:carbG,f:fatG,fib:fibG},actualRate,projection,
-    setUp:!!(p.height&&p.age)};
+  const startKg=p.startW!=null?wOut(p.startW):(series.length&&lastWeighIndex(series)>=0
+    ? series[series.findIndex(r=>r.weight!=null)].weight : null);
+  const sinceStart=(startKg!=null&&kg!=null)?kg-startKg:null;
+  return {p,series,burn,kg,refKg,startKg,sinceStart,target,bmr,floored,rateKg,
+    macro:{p:protG,c:carbG,f:fatG,fib:fibG},micro:microTargets(p,target),
+    actualRate,projection,setUp:!!(p.height&&p.age)};
 }
 
 /* ==========================================================================
@@ -1227,6 +1334,17 @@ function renderToday(){
     tr.appendChild(i); r.appendChild(tr); rows.appendChild(r);
   }
 
+  renderMicros($("#microGrid"),t.mi,M.micro);
+  const cov=t.kcal?Math.round(t.miKcal/t.kcal*100):0;
+  $("#microSub").textContent=t.n?cov+"% of calories covered":"";
+  $("#microNote").textContent=!t.n
+    ? "Nothing logged yet, so every meter reads zero."
+    : cov>=95
+      ? "Every item today carries nutrient data. Sugars are total sugars, fruit and milk included, "
+        +"against a limit written for added sugar."
+      : (100-cov)+"% of today's calories came from items with no nutrient data \u2014 quick adds and "
+        +"estimates \u2014 so these totals read low.";
+
   const mp=$("#mealsPanel"); mp.textContent="";
   const day=S.days.get(S.cur);
   for(const [slot,label] of SLOTS){
@@ -1268,6 +1386,29 @@ function renderToday(){
   const w=day&&day.weight!=null?r1(wIn(day.weight)):"";
   const wi=$("#weightIn"); if(document.activeElement!==wi) wi.value=w===""?"":w;
   wi.placeholder=metric()?"e.g. 82.4":"e.g. 181.5";
+  const lc=lastCheckin();
+  const gap=lc?daysBetween(lc,TODAY()):null;
+  const due=!lc||gap>=7;
+  const dueBox=$("#checkinDue");
+  dueBox.hidden=!due;
+  if(due){
+    dueBox.className="note warnbox"; dueBox.style.margin="0 0 11px";
+    dueBox.textContent=lc
+      ? "Weekly check-in due \u2014 the last one was "+gap+" days ago."
+      : "No measurements recorded yet. A weekly check-in gives the body trends something to work from.";
+  }
+  const ss=$("#statsSummary"); ss.textContent="";
+  const cs=checkins(); const latest=cs.length?cs[cs.length-1]:null;
+  if(latest){
+    const parts=BODY.filter(([k])=>latest[k]!=null)
+      .map(([k,label])=>label+" "+r1(k==="bf"?latest[k]:lIn(latest[k]))
+        +(k==="bf"?"%":" "+hUnit()));
+    const d=el("div","note"); d.style.margin="10px 0 0";
+    d.textContent=parts.length
+      ? "Last check-in "+prettyDay(latest.k)+" \u2014 "+parts.join(", ")+"."
+      : "Last check-in "+prettyDay(latest.k)+".";
+    ss.appendChild(d);
+  }
   const ls=lastScale(M.series);
   $("#weighSub").textContent=M.kg!=null
     ? "trend "+r1(wIn(M.kg)).toFixed(2)+" "+wUnit()+(ls&&ls.k!==S.cur?" · last "+prettyDay(ls.k).toLowerCase():"")
@@ -1295,6 +1436,7 @@ function renderTrends(){
     "",proj&&proj.date?"Goal date":"Goal",
     proj?(proj.date?Math.round(proj.weeks)+" weeks out":"at goal weight"):"set a goal weight");
 
+  padStats(st);
   const ex=$("#tdeeExplain");
   if(b.measured!=null){
     ex.innerHTML="Over the last "+b.days+" days you averaged <b>"+r0(b.meanIntake)+
@@ -1329,10 +1471,69 @@ function renderTrends(){
   stat(cs,streak,"days","Logging streak",streak>=7?"keep it":"log today to extend");
   stat(cs,w7.avg==null?"—":r0(w7.avg),"kcal","7-day average",w7.logged+" of 7 logged");
   stat(cs,w28.avg==null?"—":r0(w28.avg),"kcal","28-day average",w28.logged+" of "+w28.days+" logged");
-  stat(cs,w28.days?Math.round(w28.wts/w28.days*100):0,"%","Weigh-in rate","last 28 days");
+  stat(cs,w28.wts,"","Weigh-ins","in the last "+w28.days+" days");
   stat(cs,protDays==null?"—":protDays,"%","Protein hit","days at 90% of target");
   stat(cs,S.days.size,"","Days on record",S.foods.length+" own foods, "+S.meals.length+" meals");
+  padStats(cs);
   $("#consSub").textContent="";
+
+  const microDays=[]; 
+  for(let i=Math.max(0,last-6);i<=last;i++) if(ser[i]&&ser[i].kcal!=null) microDays.push(ser[i]);
+  const avgMi=ZM(); let avgKcal=0, avgCovered=0;
+  for(const d of microDays){ for(let i=0;i<13;i++) avgMi[i]+=(d.mi&&d.mi[i])||0;
+    avgKcal+=d.kcal||0; avgCovered+=d.miKcal||0; }
+  const nAvg=microDays.length||1;
+  renderMicros($("#microAvgGrid"),avgMi.map(v=>v/nAvg),M.micro);
+  $("#microAvgSub").textContent=microDays.length
+    ? "average of "+microDays.length+" logged day"+(microDays.length>1?"s":"") : "no data yet";
+  $("#microAvgNote").textContent=microDays.length
+    ? "Vitamins and minerals are worth judging across a week rather than a day \u2014 a single "
+      +"liver-and-spinach dinner carries a fortnight of some of these. Coverage over the week: "
+      +(avgKcal?Math.round(avgCovered/avgKcal*100):0)+"% of calories."
+    : "Log a few days and this fills in.";
+
+  const bs=$("#bodyStats"); bs.textContent="";
+  const cks=checkins();
+  const startKg=M.startKg;
+  stat(bs,startKg==null?"\u2014":r1(wIn(startKg)).toFixed(1),wUnit(),"Start weight",
+    M.p.startW!=null?"as you set it":"first weigh-in");
+  stat(bs,M.kg==null?"\u2014":r1(wIn(M.kg)).toFixed(1),wUnit(),"Now","trend weight");
+  stat(bs,M.sinceStart==null?"\u2014":(M.sinceStart>0?"+":"")+r1(wIn(M.sinceStart)).toFixed(1),
+    wUnit(),"Since start",M.p.goalW!=null&&M.kg!=null
+      ? r1(Math.abs(wIn(M.kg)-M.p.goalW)).toFixed(1)+" "+wUnit()+" to goal":"",
+    M.sinceStart==null||!M.rateKg?"":(Math.sign(M.sinceStart)===Math.sign(M.rateKg)?"up":"down"));
+  for(const [k,label] of BODY){
+    const vals=cks.filter(c=>c[k]!=null);
+    if(!vals.length) continue;
+    const first=vals[0][k], lastv=vals[vals.length-1][k];
+    const disp=v=>k==="bf"?r1(v):r1(lIn(v));
+    const unit=k==="bf"?"%":hUnit();
+    const ch=vals.length>1?lastv-first:null;
+    stat(bs,disp(lastv),unit,label,
+      ch==null?"one reading":(ch>0?"+":"")+disp(ch)+" "+unit+" since start");
+  }
+  if(!cks.length&&startKg==null) bs.appendChild(noteRow(
+    "Set a starting weight in Setup, then log a weekly check-in from the Today tab."));
+  padStats(bs);
+  $("#bodySub").textContent=cks.length?cks.length+" check-in"+(cks.length>1?"s":""):"";
+
+  const btbl=$("#bodyTable"); btbl.textContent="";
+  const used=BODY.filter(([k])=>cks.some(c=>c[k]!=null));
+  if(cks.length){
+    btbl.innerHTML="<thead><tr><th>Date</th><th>Weight</th>"+
+      used.map(([,l])=>"<th>"+esc(l)+"</th>").join("")+"<th>Note</th></tr></thead>";
+    const tb=el("tbody");
+    for(const c of cks.slice(-12).reverse()){
+      const tr=el("tr");
+      tr.appendChild(el("td",null,prettyDay(c.k)));
+      tr.appendChild(el("td",null,c.w!=null?r1(wIn(c.w)).toFixed(1):"\u2014"));
+      for(const [k] of used) tr.appendChild(el("td",null,
+        c[k]==null?"\u2014":String(k==="bf"?r1(c[k]):r1(lIn(c[k])))));
+      tr.appendChild(el("td",null,c.note||""));
+      tb.appendChild(tr);
+    }
+    btbl.appendChild(tb);
+  }
 
   const tbl=$("#dayTable");
   tbl.innerHTML="<thead><tr><th>Day</th><th>Kcal</th><th>P</th><th>C</th><th>F</th>"
@@ -1352,6 +1553,43 @@ function renderTrends(){
     tb.appendChild(tr);
   }
   tbl.appendChild(tb);
+}
+const miNum=v=>v>=100?r0(v):Math.round(v*10)/10;
+function fmtMi(have,want,u){ return miNum(have)+" / "+miNum(want)+" "+u; }
+function renderMicros(grid,mi,targets){
+  grid.textContent="";
+  targets.forEach((m,i)=>{
+    const have=mi[i]||0, want=m.t||0;
+    const pct=want?have/want*100:0;
+    const over=m.cap&&have>want, met=!m.cap&&pct>=100;
+    const box=el("div","mi");
+    box.appendChild(el("div","n",m.n));
+    const tr=el("div","track"); const bar=el("i");
+    bar.style.width=clamp(pct,0,100)+"%";
+    bar.style.background=over?"var(--crit)":met?"var(--good)":"var(--m-p)";
+    tr.appendChild(bar); box.appendChild(tr);
+    const foot=el("div","foot");
+    foot.appendChild(el("span","v",fmtMi(have,want,m.u)));
+    const flag=el("span","flag",m.cap?(over?"over limit":r0(pct)+"% of limit")
+      :(met?"target met":r0(pct)+"% of target"));
+    flag.style.color=over?"var(--crit-ink)":met?"var(--good-ink)":"var(--muted)";
+    foot.appendChild(flag); box.appendChild(foot);
+    grid.appendChild(box);
+  });
+}
+function checkins(){
+  return sortedKeys().map(k=>({k,d:S.days.get(k)})).filter(x=>x.d&&x.d.stats)
+    .map(x=>({k:x.k,w:x.d.weight,...x.d.stats}));
+}
+function lastCheckin(){ const c=checkins(); return c.length?c[c.length-1].k:null; }
+function padStats(host){
+  const n=host.children.length; if(!n) return;
+  const w=host.clientWidth, cw=host.firstElementChild.offsetWidth;
+  if(!w||!cw) return;
+  const cols=Math.max(1,Math.round((w+1)/(cw+1)));
+  const need=(cols-(n%cols))%cols;
+  for(let i=0;i<need;i++){ const f=el("div","stat"); f.setAttribute("aria-hidden","true");
+    host.appendChild(f); }
 }
 function stat(host,v,unit,key,delta,dir){
   const s=el("div","stat");
@@ -1374,7 +1612,8 @@ function addEntries(list,dayKey){
   const ids=[];
   for(const e of list){ const id=uid(); ids.push(id);
     day.entries.push({id,slot:e.slot||pendingSlot||slotNow(),n:e.n||"Food",
-      kcal:+e.kcal||0,p:+e.p||0,c:+e.c||0,f:+e.f||0,fib:+e.fib||0,q:e.q||"",src:e.src||""}); }
+      kcal:+e.kcal||0,p:+e.p||0,c:+e.c||0,f:+e.f||0,fib:+e.fib||0,q:e.q||"",src:e.src||"",
+      mi:Array.isArray(e.mi)&&e.mi.length===13?e.mi.map(v=>Math.round((+v||0)*100)/100):null}); }
   queueDay(k);
   lastUndo={k,ids};
   renderAll();
@@ -1492,9 +1731,10 @@ function resultRow(name,sub,right,tag,onclick){
   return b;
 }
 function mealTotals(m){
-  const t={kcal:0,p:0,c:0,f:0,fib:0};
+  const t={kcal:0,p:0,c:0,f:0,fib:0,mi:ZM()};
   for(const it of m.items){ t.kcal+=it.kcal||0; t.p+=it.p||0; t.c+=it.c||0; t.f+=it.f||0;
-    t.fib+=it.fib||0; }
+    t.fib+=it.fib||0;
+    if(Array.isArray(it.mi)) for(let i=0;i<13;i++) t.mi[i]+=+it.mi[i]||0; }
   return t;
 }
 function logMeal(m,slot){
@@ -1563,6 +1803,7 @@ function portionSheet(f,existing){
       const g=useG?(+grams.value||0):(+qty.value||0)*f.srv[+srvSel.value][1];
       const m=g/100;
       return {g,kcal:f.kcal*m,p:f.p*m,c:f.c*m,f:f.f*m,fib:(f.fib||0)*m,
+        mi:(f.mi||ZM()).map(v=>(+v||0)*m),
         q:useG?r0(g)+" g":(r1(+qty.value||0)+" × "+f.srv[+srvSel.value][0])};
     }
     function sync(){
@@ -1579,9 +1820,49 @@ function portionSheet(f,existing){
     sync();
     ok.onclick=()=>{
       const t=totals();
-      addEntries([{n:f.n,kcal:t.kcal,p:t.p,c:t.c,f:t.f,fib:t.fib,q:t.q,slot:slotSel.value}]);
+      addEntries([{n:f.n,kcal:t.kcal,p:t.p,c:t.c,f:t.f,fib:t.fib,mi:t.mi,q:t.q,
+        slot:slotSel.value}]);
       if(f.own){ f.used=(f.used||0)+1; putFood(f); }
       close();
+    };
+  });
+}
+function checkinSheet(){
+  const day=getDay(S.cur,true);
+  const st={...(day.stats||{})};
+  sheet("Check-in, "+prettyDay(S.cur).toLowerCase(),(body,close)=>{
+    body.appendChild(noteRow("Weigh and measure under the same conditions each week \u2014 "
+      +"first thing, before eating, same tape tension. Leave anything you do not track blank."));
+    const w=numInput(day.weight!=null?r1(wIn(day.weight)):"","0.1");
+    body.appendChild(field("Weight "+wUnit(),w));
+    const g=el("div","grid2"); const ins={};
+    for(const [k,label] of BODY){
+      const unit=k==="bf"?"%":hUnit();
+      ins[k]=numInput(st[k]!=null?r1(k==="bf"?st[k]:lIn(st[k])):"","0.1");
+      g.appendChild(field(label+" "+unit,ins[k]));
+    }
+    body.appendChild(g);
+    const note=document.createElement("input"); note.type="text";
+    note.value=st.note||""; note.placeholder="Sleep, training, travel, anything that explains the week";
+    body.appendChild(field("Note",note));
+    const btns=el("div","btnrow");
+    const ok=el("button","btn primary grow","Save check-in");
+    btns.appendChild(ok);
+    if(day.stats){
+      const dl=el("button","btn ghost danger","Clear");
+      dl.onclick=()=>{ day.stats=null; queueDay(S.cur); close(); renderAll();
+        toast("Check-in cleared"); };
+      btns.appendChild(dl);
+    }
+    body.appendChild(btns);
+    ok.onclick=()=>{
+      day.weight=w.value===""?null:wOut(+w.value);
+      const out={};
+      for(const [k] of BODY){ const v=ins[k].value;
+        if(v!=="") out[k]=k==="bf"?+v:lOut(+v); }
+      if(note.value.trim()) out.note=note.value.trim();
+      day.stats=Object.keys(out).length?out:(day.weight!=null?{}:null);
+      queueDay(S.cur); close(); renderAll(); toast("Check-in saved");
     };
   });
 }
@@ -1610,7 +1891,8 @@ function editEntry(e){
 }
 function foodSheet(f){
   const isNew=!f;
-  const d=f||{id:uid(),n:"",cat:"pro",kcal:0,p:0,c:0,f:0,fib:0,srv:[["100 g",100]],own:true,used:0};
+  const d=f||{id:uid(),n:"",cat:"pro",kcal:0,p:0,c:0,f:0,fib:0,mi:ZM(),
+    srv:[["100 g",100]],own:true,used:0};
   sheet(isNew?"New food":"Edit food",(body,close)=>{
     const n=document.createElement("input"); n.type="text"; n.value=d.n;
     n.placeholder="Per 100 g — e.g. Tesco chicken thighs";
@@ -1623,6 +1905,7 @@ function foodSheet(f){
     const sName=document.createElement("input"); sName.type="text";
     sName.value=d.srv[0][0]; sName.placeholder="pack, 160 g";
     const sG=numInput(d.srv[0][1],"1");
+    const mis=MICROS.map((m,i)=>numInput(r1((d.mi||ZM())[i]||0),"0.1"));
     body.appendChild(field("Name",n));
     body.appendChild(field("Group",cat));
     const g=el("div","grid3");
@@ -1630,6 +1913,14 @@ function foodSheet(f){
       field("Fibre",fib)); body.appendChild(g);
     const g2=el("div","grid2"); g2.append(field("Serving name",sName),field("Serving grams",sG));
     body.appendChild(g2);
+    const det=document.createElement("details");
+    const sum=document.createElement("summary");
+    sum.className="lbl"; sum.style.cursor="pointer"; sum.style.padding="6px 0";
+    sum.textContent="Micronutrients per 100 g — optional";
+    det.appendChild(sum);
+    const mgrid=el("div","grid3"); mgrid.style.marginTop="8px";
+    MICROS.forEach((m,i)=>mgrid.appendChild(field(m.n+" "+m.u,mis[i])));
+    det.appendChild(mgrid); body.appendChild(det);
     const btns=el("div","btnrow");
     const ok=el("button","btn primary grow",isNew?"Create":"Save");
     btns.appendChild(ok); body.appendChild(btns);
@@ -1637,6 +1928,7 @@ function foodSheet(f){
       if(!n.value.trim()) return n.focus();
       Object.assign(d,{n:n.value.trim(),cat:cat.value,kcal:+k.value||0,p:+p.value||0,
         c:+c.value||0,f:+ft.value||0,fib:+fib.value||0,own:true,
+        mi:mis.map(x=>+x.value||0),
         srv:[[sName.value.trim()||"100 g",+sG.value||100],["100 g",100]]});
       if(isNew) S.foods.unshift(d);
       putFood(d); close(); renderAll();
@@ -1707,7 +1999,7 @@ function mealSheet(m){
           f.own?"own":null,()=>{
             const s=f.srv[0], mul=s[1]/100;
             d.items.push({n:f.n,kcal:f.kcal*mul,p:f.p*mul,c:f.c*mul,f:f.f*mul,
-              fib:(f.fib||0)*mul,q:"1 × "+s[0]});
+              fib:(f.fib||0)*mul,mi:(f.mi||ZM()).map(v=>(+v||0)*mul),q:"1 × "+s[0]});
             q.value=""; res.textContent=""; draw();
           }));
       }
@@ -1737,7 +2029,7 @@ function saveDayAsMeal(){
   const day=S.days.get(S.cur);
   if(!day||!day.entries.length) return toast("Nothing logged on this day");
   const m={id:uid(),n:"",used:0,
-    items:day.entries.map(e=>({n:e.n,kcal:e.kcal,p:e.p,c:e.c,f:e.f,fib:e.fib,q:e.q}))};
+    items:day.entries.map(e=>({n:e.n,kcal:e.kcal,p:e.p,c:e.c,f:e.f,fib:e.fib,mi:e.mi,q:e.q}))};
   mealSheet(m);
   S.meals=S.meals.filter(x=>x.id!==m.id);
 }
@@ -1752,6 +2044,8 @@ function renderSetup(){
   $("#pSex").value=p.sex; $("#pAge").value=p.age??"";
   $("#pHeight").value=p.height??""; $("#pAct").value=String(p.act);
   $("#hLbl").textContent="Height "+hUnit();
+  $("#swLbl").textContent="Starting weight "+wUnit();
+  $("#pStartW").value=p.startW??"";
   $("#gwLbl").textContent="Goal weight "+wUnit();
   $("#rateLbl").textContent="Rate per week "+wUnit();
   $("#pGoalW").value=p.goalW??""; $("#pRate").value=p.rate??"";
@@ -1780,6 +2074,7 @@ function bindSetup(){
     const to=b.dataset.v; if(to===p.units) return;
     const toImp=to==="imperial";
     if(p.height) p.height=r1(toImp?p.height*IN:p.height/IN);
+    if(p.startW!=null) p.startW=r1(toImp?p.startW*LB:p.startW/LB);
     if(p.goalW!=null) p.goalW=r1(toImp?p.goalW*LB:p.goalW/LB);
     if(p.rate!=null) p.rate=r1(toImp?p.rate*LB:p.rate/LB);
     p.prot=r1(toImp?p.prot/LB:p.prot*LB);
@@ -1796,7 +2091,8 @@ function bindSetup(){
     p[key]=v; queueProfile(); if(S.tab!=="setup") renderAll(); };
     $(sel).onchange=()=>renderAll(); };
   bind("#pSex","sex"); bind("#pAge","age",1); bind("#pHeight","height",1);
-  bind("#pAct","act"); bind("#pGoalW","goalW",1); bind("#pRate","rate",1);
+  bind("#pAct","act"); bind("#pStartW","startW",1); bind("#pGoalW","goalW",1);
+  bind("#pRate","rate",1);
   bind("#pProt","prot",1); bind("#pFat","fat",1);
   bind("#pWindow","win",1); bind("#pKcalKg","kcalKg",1);
 }
@@ -1883,9 +2179,21 @@ const JSON_SHAPE=
 If they clearly referred to one of their saved meals:
 {"slot":"lunch","mealId":"<id from the list>"}
 Otherwise:
-{"slot":"lunch","items":[{"n":"Scrambled eggs","q":"2 eggs","kcal":180,"p":13,"c":1,"f":13,"fib":0}]}
-Rules: kcal, p, c, f and fib are TOTALS for the amount eaten, not per 100 g. Assume ordinary
-portions when no amount is given. Whole numbers. Short names. Never add food they did not mention.`;
+{"slot":"lunch","items":[{"n":"Scrambled eggs","q":"2 eggs","kcal":180,"p":13,"c":1,"f":13,"fib":0,
+"mi":{"sat":4,"sug":1,"na":320,"ka":140,"ca":60,"fe":1.8,"mg":12,"zn":1.3,"vc":0,"vd":2,"b12":1.1,
+"fol":47,"va":160}}]}
+Rules: kcal, p, c, f, fib and every "mi" value are TOTALS for the amount eaten, not per 100 g.
+"mi" is optional but give it where you reasonably can: sat and sug in grams, na, ka, ca, fe, mg,
+zn and vc in milligrams, vd, b12, fol and va in micrograms. Drop any key you cannot judge rather
+than guessing wildly, and drop "mi" entirely for something you do not recognise. Assume ordinary
+portions when no amount is given. Short names. Never add food they did not mention.`;
+function miFromObj(o){
+  if(!o||typeof o!=="object") return null;
+  const a=ZM(); let any=false;
+  for(const m of MICROS){ const v=+o[m.k];
+    if(isFinite(v)&&v>0){ a[MI_INDEX[m.k]]=v; any=true; } }
+  return any?a:null;
+}
 
 async function runNl(){
   const text=$("#nlInput").value.trim();
@@ -1916,7 +2224,8 @@ async function runNl(){
     const items=(out&&Array.isArray(out.items)?out.items:[]).filter(i=>i&&(+i.kcal>0));
     if(!items.length){ setNlStatus("Nothing could be read from that. Try naming the foods and the amounts."); return; }
     addEntries(items.map(i=>({n:String(i.n||"Food").slice(0,60),q:String(i.q||"").slice(0,40),
-      kcal:+i.kcal||0,p:+i.p||0,c:+i.c||0,f:+i.f||0,fib:+i.fib||0,slot,src:"estimated"})));
+      kcal:+i.kcal||0,p:+i.p||0,c:+i.c||0,f:+i.f||0,fib:+i.fib||0,mi:miFromObj(i.mi),
+      slot,src:"estimated"})));
     $("#nlInput").value="";
     setNlStatus("Logged "+items.length+" item"+(items.length>1?"s":"")+
       ", estimated by Claude. Tap any line to correct it.");
@@ -1935,13 +2244,18 @@ async function runPhoto(file,kind){
       const out=await S.sample.json(
         "This is a photograph of a packaged food's nutrition information. Read it and reply with ONLY "+
         'this JSON: {"n":"product name","kcal":0,"p":0,"c":0,"f":0,"fib":0,"servingName":"pack, 160 g",'+
-        '"servingGrams":160}\nkcal, p, c, f and fib must be PER 100 g or per 100 ml — convert if the '+
-        "label only gives a serving. servingGrams is one typical serving in grams. If a value is not "+
-        "shown, use 0.",
+        '"servingGrams":160,"mi":{"sat":0,"sug":0,"na":0,"ka":0,"ca":0,"fe":0,"mg":0,"zn":0,"vc":0,'+
+        '"vd":0,"b12":0,"fol":0,"va":0}}\nEvery nutrient value must be PER 100 g or per 100 ml '+
+        "— convert if the label only gives a figure per serving. servingGrams is one typical "+
+        "serving in grams. In mi: sat and sug in grams, na, ka, ca, fe, mg, zn and vc in milligrams, "+
+        "vd, b12, fol and va in micrograms; if the label prints salt rather than sodium, divide by "+
+        "2.5 to get sodium. Omit any mi key the label does not show. If a main value is not shown, "+
+        "use 0.",
         {images:[file],modelTier:"default"});
       if(!out||!(+out.kcal>0)) { setNlStatus("Could not read that label. Try a closer, flatter photo."); return; }
       const f={id:uid(),n:String(out.n||"Scanned food").slice(0,60),cat:"pro",
         kcal:+out.kcal||0,p:+out.p||0,c:+out.c||0,f:+out.f||0,fib:+out.fib||0,own:true,used:0,
+        mi:miFromObj(out.mi)||ZM(),
         srv:[[String(out.servingName||"serving").slice(0,30),+out.servingGrams||100],["100 g",100]]};
       S.foods.unshift(f); putFood(f); renderAll();
       setNlStatus("Saved <b>"+esc(f.n)+"</b> to your foods. Check the numbers, then add a portion.");
@@ -1957,7 +2271,8 @@ async function runPhoto(file,kind){
       if(!items.length){ setNlStatus("No food could be identified in that photo."); return; }
       const slot=SLOT_WORDS[String(out.slot||"").toLowerCase()]||slotNow();
       addEntries(items.map(i=>({n:String(i.n||"Food").slice(0,60),q:String(i.q||"").slice(0,40),
-        kcal:+i.kcal||0,p:+i.p||0,c:+i.c||0,f:+i.f||0,fib:+i.fib||0,slot,src:"from photo"})));
+        kcal:+i.kcal||0,p:+i.p||0,c:+i.c||0,f:+i.f||0,fib:+i.fib||0,mi:miFromObj(i.mi),
+        slot,src:"from photo"})));
       setNlStatus("Logged "+items.length+" item"+(items.length>1?"s":"")+
         " from the photo. Tap any line to correct it.");
     }
@@ -1968,7 +2283,10 @@ async function runPhoto(file,kind){
    Export / erase
    ========================================================================== */
 function csv(){
-  const rows=[["date","kcal","protein_g","carbs_g","fat_g","fibre_g","weight_kg","trend_kg",
+  const miCols=MICROS.map(m=>m.k+"_"+(m.u==="\u00b5g"?"ug":m.u));
+  const bodyCols=BODY.map(([k])=>k==="bf"?"bodyfat_pct":k+"_cm");
+  const rows=[["date","kcal","protein_g","carbs_g","fat_g","fibre_g",...miCols,
+    "micro_coverage_pct","weight_kg","trend_kg",...bodyCols,"checkin_note",
     "burn_kcal","target_kcal","entries"]];
   const ser=buildSeries();
   ser.forEach((s,i)=>{
@@ -1976,9 +2294,14 @@ function csv(){
     const b=burnAt(ser,i,S.profile);
     const rate=S.profile.goal==="maintain"?0:wOut(S.profile.rate||0);
     const d=S.days.get(s.k);
+    const stt=(d&&d.stats)||{};
     rows.push([s.k,t.n?r0(t.kcal):"",r1(t.p),r1(t.c),r1(t.f),r1(t.fib),
-      s.weight==null?"":r1(s.weight),s.trend==null?"":r1(s.trend),r0(b.tdee),
-      r0(b.tdee+rate*kcalPerW()/7),
+      ...t.mi.map(v=>r1(v)),
+      t.kcal?Math.round(t.miKcal/t.kcal*100):"",
+      s.weight==null?"":r1(s.weight),s.trend==null?"":r1(s.trend),
+      ...BODY.map(([k])=>stt[k]==null?"":r1(stt[k])),
+      stt.note||"",
+      r0(b.tdee),r0(b.tdee+rate*kcalPerW()/7),
       (d&&d.entries||[]).map(e=>e.n+" ("+r0(e.kcal)+")").join("; ")]);
   });
   return rows.map(r=>r.map(c=>{ const s=String(c);
@@ -2057,6 +2380,7 @@ $("#qaAdd").onclick=()=>{
     c:+$("#qaC").value||0,f:+$("#qaF").value||0,fib:0,src:"quick add"}]);
   for(const id of ["#qaName","#qaKcal","#qaP","#qaC","#qaF"]) $(id).value="";
 };
+$("#openCheckin").onclick=checkinSheet;
 $("#newFood").onclick=()=>foodSheet(null);
 $("#newMeal").onclick=()=>mealSheet(null);
 $("#mealFromDay").onclick=saveDayAsMeal;
@@ -2115,14 +2439,15 @@ bindSetup();
       const map=new Map();
       for(const d of snap.docs){ const v=d.data()||{};
         map.set(d.id,{date:d.id,entries:Array.isArray(v.entries)?v.entries:[],
-          weight:v.weight==null?null:+v.weight,note:v.note||""}); }
+          weight:v.weight==null?null:+v.weight,stats:v.stats||null,note:v.note||""}); }
       if(map.size||seen.days) S.days=map;
     }
     done("days"); renderAll();
   },onErr);
   db.collection("foods").limit(800).onSnapshot(snap=>{
     const list=snap.docs.map(d=>({...d.data(),id:d.id,own:true}))
-      .filter(f=>f.n).map(f=>({...f,srv:Array.isArray(f.srv)&&f.srv.length?f.srv:[["100 g",100]]}));
+      .filter(f=>f.n).map(f=>({...f,srv:Array.isArray(f.srv)&&f.srv.length?f.srv:[["100 g",100]],
+        mi:Array.isArray(f.mi)&&f.mi.length===13?f.mi:ZM()}));
     if(list.length||seen.foods) S.foods=list;
     done("foods"); renderAll();
   },onErr);
